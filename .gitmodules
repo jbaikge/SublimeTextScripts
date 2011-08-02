@@ -1,0 +1,6 @@
+[submodule "Packages/ZenCoding"]
+	path = Packages/ZenCoding
+	url = git://github.com/zeebo/ZenCoding.git
+[submodule "Packages/sublimelint"]
+	path = Packages/sublimelint
+	url = git://github.com/lunixbochs/sublimelint.git
