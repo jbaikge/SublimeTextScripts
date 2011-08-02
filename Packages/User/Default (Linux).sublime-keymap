@@ -1,0 +1,32 @@
+[
+	{
+		"keys": ["enter"],
+		"command": "insert",
+		"args": {
+			"characters": "\n* "
+		},
+		"context": [
+			{
+				"key": "preceding_text",
+				"operator": "regex_contains",
+				"operand": "^[\t ]*\\*($|[^/])",
+				"match_all": true
+			}
+		]
+	},
+	{
+		"keys": ["enter"],
+		"command": "insert_snippet",
+		"args": {
+			"contents": "\n * $0\n */"
+		},
+		"context": [
+			{
+				"key": "preceding_text",
+				"operator": "regex_contains",
+				"operand": "^[\t ]*/\\*[\\*!]($|[^/])",
+				"match_all": true
+			}
+		]
+	}
+]

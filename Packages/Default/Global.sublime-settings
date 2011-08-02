@@ -1,0 +1,14 @@
+{
+	"theme": "Default.sublime-theme",
+	"remember_open_files": true,
+	"folder_exclude_patterns": [".svn", ".git", ".hg", "CVS"],
+	"file_exclude_patterns": ["*.pyc", "*.pyo", "*.exe", "*.dll", "*.obj", "*.o", "*.a", "*.lib", "*.so", "*.dylib", "*.ncb", "*.sdf", "*.suo", "*.pdb", "*.idb", ".DS_Store", "*.pdf", "*.class"],
+	// Set to 0 to disable smooth scrolling. Set to a value between 0 and 1 to
+	// scroll slower, or set to larger than 1 to scroll faster
+	"scroll_speed": 1.0,
+	"show_tab_close_buttons": true,
+	"mouse_wheel_switches_tabs": false,
+	// OS X only: When filter are opened from finder, or by dragging onto the
+	// dock icon, this controls if a new window is created or not.
+	"open_files_in_new_window": true
+}
