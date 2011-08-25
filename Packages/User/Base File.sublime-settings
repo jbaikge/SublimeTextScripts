@@ -1,10 +1,10 @@
 {
-	"color_scheme": "Packages/Color Scheme - Default/Monokai Bright.tmTheme",
+	"caret_style": "phase",
+	"color_scheme": "Packages/User/Monokai Soda.tmTheme",
 	"font_size": 8.5,
 	"rulers":
 	[
 		80
 	],
-	"word_wrap": false,
-	"caret_style": "phase"
+	"word_wrap": false
 }
