@@ -4,3 +4,6 @@
 [submodule "Packages/sublimelint"]
 	path = Packages/sublimelint
 	url = git://github.com/lunixbochs/sublimelint.git
+[submodule "Packages/Theme - Soda"]
+	path = Packages/Theme - Soda
+	url = git://github.com/buymeasoda/soda-theme.git
