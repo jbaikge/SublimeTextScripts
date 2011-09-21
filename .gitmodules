@@ -7,3 +7,6 @@
 [submodule "Packages/Theme - Soda"]
 	path = Packages/Theme - Soda
 	url = git://github.com/buymeasoda/soda-theme.git
+[submodule "Packages/TrafPaste"]
+	path = Packages/TrafPaste
+	url = git://zeeb.us.to/TrafPaste
