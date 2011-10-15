@@ -27,6 +27,9 @@
 	// Set to false to hide the gutter altogether
 	"gutter": true,
 
+	// Fold buttons are the triangles shown in the gutter to fold regions of text
+	"fold_buttons": true,
+
 	// Columns in which to display vertical rulers
 	"rulers": [],
 
