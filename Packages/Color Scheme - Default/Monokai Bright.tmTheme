@@ -45,7 +45,7 @@
 				<string>underline</string>
 
 				<key>tagsOptions</key>
-				<string>underline</string>
+				<string>stippled_underline</string>
 			</dict>
 		</dict>
 		<dict>

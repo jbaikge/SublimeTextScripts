@@ -1,6 +1,7 @@
 {
 	"caret_style": "phase",
 	"color_scheme": "Packages/User/Monokai Soda.tmTheme",
+	"draw_white_space": "all",
 	"font_size": 8.5,
 	"rulers":
 	[

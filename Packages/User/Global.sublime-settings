@@ -1,5 +1,6 @@
 // Place user-specific overrides in this file, to ensure they're preserved
 // when upgrading
 {
-	"theme": "Soda Dark.sublime-theme"
+	"theme": "Soda Dark.sublime-theme",
+	"paste.key": "922df615b81dd5cc08a8"
 }
