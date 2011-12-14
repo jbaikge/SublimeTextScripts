@@ -245,7 +245,6 @@
         [
             { "class": "tree_row", "attributes": ["hover"] }
         ],
-        // "attributes": ["hover"],
         "layer0.opacity": 0.0,
         "layer1.opacity": 1.0
     },
@@ -280,7 +279,7 @@
     {
         "class": "close_button",
         "layer0.texture": "Theme - Default/cross.png",
-        "layer0.opacity": 1.0,
+        "layer0.opacity": { "target": 1.0, "speed": 4.0, "interpolation": "smoothstep" },
         "layer0.inner_margin": 0,
         "layer1.texture": "Theme - Default/cross_over.png",
         "layer1.opacity": { "target": 0.0, "speed": 4.0, "interpolation": "smoothstep" },
@@ -288,7 +287,13 @@
     },
     {
         "class": "close_button",
+        "attributes": ["dirty"],
+        "layer0.texture": "Theme - Default/dirty_indicator.png"
+    },
+    {
+        "class": "close_button",
         "attributes": ["hover"],
+        "layer0.opacity": 0.0,
         "layer1.opacity": 1.0
     },
     {
@@ -491,10 +496,9 @@
     {
         "class": "tab_close_button",
         "layer0.texture": "Theme - Default/unpadded_cross.png",
-        "layer0.opacity": 1.0,
+        "layer0.opacity": { "target": 1.0, "speed": 4.0, "interpolation": "smoothstep" },
         "layer0.inner_margin": 0,
         "layer1.texture": "Theme - Default/unpadded_cross_over.png",
-        "layer1.opacity": 0.0,
         "layer1.opacity": { "target": 0.0, "speed": 4.0, "interpolation": "smoothstep" },
         "content_margin": [0, 0]        // set below if tab close buttons are enabled
     },
@@ -505,7 +509,13 @@
     },
     {
         "class": "tab_close_button",
+        "parents": [{"class": "tab_control", "attributes": ["dirty"]}],
+        "layer0.texture": "Theme - Default/unpadded_dirty_indicator.png"
+    },
+    {
+        "class": "tab_close_button",
         "attributes": ["hover"],
+        "layer0.opacity": 0.0,
         "layer1.opacity": 1.0
     },
 

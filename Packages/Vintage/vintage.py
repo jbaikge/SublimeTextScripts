@@ -28,6 +28,7 @@ class InputState:
     motion_command_args = None
     motion_mode = MOTION_MODE_NORMAL
     motion_inclusive = False
+    motion_clip_to_line = False
     register = None
 
 g_input_state = InputState()
@@ -47,7 +48,7 @@ def update_status_line(view):
 
         repeat = (digits_to_number(g_input_state.prefix_repeat_digits)
             * digits_to_number(g_input_state.motion_repeat_digits))
-        if g_input_state.action_command != None or repeat != 1:
+        if g_input_state.action_command is not None or repeat != 1:
             cmd_desc = g_input_state.action_command
             if g_input_state.action_description:
                 cmd_desc = g_input_state.action_description
@@ -82,6 +83,7 @@ def reset_input_state(view, reset_motion_mode = True):
     g_input_state.motion_command = None
     g_input_state.motion_command_args = None
     g_input_state.motion_inclusive = False
+    g_input_state.motion_clip_to_line = False
     g_input_state.register = None
     if reset_motion_mode:
         set_motion_mode(view, MOTION_MODE_NORMAL)
@@ -157,7 +159,7 @@ class InputStateTracker(sublime_plugin.EventListener):
             if operator == sublime.OP_NOT_EQUAL:
                 return operand != g_input_state.action_command
         elif key == "vi_has_action":
-            v = g_input_state.action_command != None
+            v = g_input_state.action_command is not None
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
         elif key == "vi_motion_mode":
@@ -174,7 +176,7 @@ class InputStateTracker(sublime_plugin.EventListener):
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
         elif key == "vi_can_enter_text_object":
-            v = (g_input_state.action_command != None) or view.has_non_empty_selection_region()
+            v = (g_input_state.action_command is not None) or view.has_non_empty_selection_region()
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
 
@@ -191,7 +193,8 @@ def eval_input(view):
         'motion_command': g_input_state.motion_command,
         'motion_args': g_input_state.motion_command_args,
         'motion_mode': g_input_state.motion_mode,
-        'motion_inclusive': g_input_state.motion_inclusive }
+        'motion_inclusive': g_input_state.motion_inclusive,
+        'motion_clip_to_line': g_input_state.motion_clip_to_line }
 
     if len(g_input_state.prefix_repeat_digits) > 0:
         cmd_args['prefix_repeat'] = digits_to_number(g_input_state.prefix_repeat_digits)
@@ -199,12 +202,12 @@ def eval_input(view):
     if len(g_input_state.motion_repeat_digits) > 0:
         cmd_args['motion_repeat'] = digits_to_number(g_input_state.motion_repeat_digits)
 
-    if g_input_state.register != None:
+    if g_input_state.register is not None:
         if not cmd_args['action_args']:
             cmd_args['action_args'] = {}
         cmd_args['action_args']['register'] = g_input_state.register
 
-    reset_motion_mode = (g_input_state.action_command != None)
+    reset_motion_mode = (g_input_state.action_command is not None)
 
     reset_input_state(view, reset_motion_mode)
 
@@ -243,7 +246,7 @@ class SetAction(sublime_plugin.TextCommand):
         g_input_state.action_command_args = action_args
         g_input_state.action_description = description
 
-        if motion_mode != None:
+        if motion_mode is not None:
             m = string_to_motion_mode(motion_mode)
             if m != -1:
                 if g_input_state.motion_mode == MOTION_MODE_LINE and m == MOTION_MODE_AUTO_LINE:
@@ -280,19 +283,22 @@ class SetMotion(sublime_plugin.TextCommand):
     def run_(self, args):
         return self.run(**args)
 
-    def run(self, motion, motion_args = {}, inclusive = False, character = None, mode = None):
+    def run(self, motion, motion_args = {}, inclusive = False,
+            clip_to_line = False, character = None, mode = None):
+
         global g_input_state
 
         # Pass the character, if any, onto the motion command.
         # This is required for 'f', 't', etc
-        if character != None:
+        if character is not None:
             motion_args['character'] = character
 
         g_input_state.motion_command = motion
         g_input_state.motion_command_args = motion_args
         g_input_state.motion_inclusive = inclusive
+        g_input_state.motion_clip_to_line = clip_to_line
 
-        if mode != None:
+        if mode is not None:
             m = string_to_motion_mode(mode)
             if m != -1:
                 set_motion_mode(self.view, m)
@@ -309,12 +315,15 @@ class SetActionMotion(sublime_plugin.TextCommand):
     def run_(self, args):
         return self.run(**args)
 
-    def run(self, motion, action, motion_args = {}, motion_inclusive = False, action_args = {}):
+    def run(self, motion, action, motion_args = {}, motion_clip_to_line = False,
+            motion_inclusive = False, action_args = {}):
+
         global g_input_state
 
         g_input_state.motion_command = motion
         g_input_state.motion_command_args = motion_args
         g_input_state.motion_inclusive = motion_inclusive
+        g_input_state.motion_clip_to_line = motion_clip_to_line
         g_input_state.action_command = action
         g_input_state.action_command_args = action_args
 
@@ -337,7 +346,6 @@ class SetMotionMode(sublime_plugin.TextCommand):
         else:
             print "invalid motion mode"
 
-# Sets the target register for the next command
 class SetRegister(sublime_plugin.TextCommand):
     def run_(self, args):
         return self.run(**args)
@@ -388,7 +396,7 @@ def transform_selection_regions(view, f):
 
     for r in sel:
         nr = f(r)
-        if nr != None:
+        if nr is not None:
             new_sel.append(nr)
 
     sel.clear()
@@ -524,13 +532,14 @@ class ViEval(sublime_plugin.TextCommand):
 
     def run(self, edit, action_command, action_args,
             motion_command, motion_args, motion_mode,
-            motion_inclusive, prefix_repeat = None, motion_repeat = None):
+            motion_inclusive, motion_clip_to_line,
+            prefix_repeat = None, motion_repeat = None):
 
-        explicit_repeat = (prefix_repeat != None or motion_repeat != None)
+        explicit_repeat = (prefix_repeat is not None or motion_repeat is not None)
 
-        if prefix_repeat == None:
+        if prefix_repeat is None:
             prefix_repeat = 1
-        if motion_repeat == None:
+        if motion_repeat is None:
             motion_repeat = 1
 
         # Arguments are always passed as floats (thanks to JSON encoding),
@@ -599,6 +608,16 @@ class ViEval(sublime_plugin.TextCommand):
                             lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
                     self.view.run_command(motion_command, motion_args)
+
+            # If the motion needs to be clipped to the line, remove any
+            # trailing newlines from the selection. For example, with the
+            # caret at the start of the last word on the line, 'dw' should
+            # delete the word, but not the newline, while 'w' should advance
+            # the caret to the first character of the next line.
+            if motion_mode != MOTION_MODE_LINE and action_command and motion_clip_to_line:
+                transform_selection_regions(self.view,
+                    lambda r: sublime.Region(r.a, r.b - 1)
+                        if (r.a < r.b and self.view.substr(r.b - 1) == '\n') else r)
 
             if motion_mode == MOTION_MODE_LINE:
                 expand_to_full_line(self.view)
@@ -675,11 +694,16 @@ class EnterVisualMode(sublime_plugin.TextCommand):
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 class ExitVisualMode(sublime_plugin.TextCommand):
-    def run(self, edit):
-        if g_input_state.motion_mode != MOTION_MODE_NORMAL:
-            set_motion_mode(self.view, MOTION_MODE_NORMAL)
+    def run(self, edit, toggle = False):
+        if toggle:
+            if g_input_state.motion_mode != MOTION_MODE_NORMAL:
+                set_motion_mode(self.view, MOTION_MODE_NORMAL)
+            else:
+                self.view.run_command('shrink_selections')
         else:
+            set_motion_mode(self.view, MOTION_MODE_NORMAL)
             self.view.run_command('shrink_selections')
+
         self.view.run_command('unmark_undo_groups_for_gluing')
 
 class EnterVisualLineMode(sublime_plugin.TextCommand):
@@ -687,11 +711,6 @@ class EnterVisualLineMode(sublime_plugin.TextCommand):
         set_motion_mode(self.view, MOTION_MODE_LINE)
         expand_to_full_line(self.view)
         self.view.run_command('maybe_mark_undo_groups_for_gluing')
-
-class ExitVisualLineMode(sublime_plugin.TextCommand):
-    def run(self, edit):
-        set_motion_mode(self.view, MOTION_MODE_NORMAL)
-        self.view.run_command('unmark_undo_groups_for_gluing')
 
 class ShrinkSelections(sublime_plugin.TextCommand):
     def shrink(self, r):
@@ -718,6 +737,13 @@ class ViDelete(sublime_plugin.TextCommand):
         set_register(self.view, register, forward=False)
         set_register(self.view, '1', forward=False)
         self.view.run_command('left_delete')
+
+class ViLeftDelete(sublime_plugin.TextCommand):
+    def run(self, edit, register = '"'):
+        set_register(self.view, register, forward=False)
+        set_register(self.view, '1', forward=False)
+        self.view.run_command('left_delete')
+        clip_empty_selection_to_line_contents(self.view)
 
 class ViRightDelete(sublime_plugin.TextCommand):
     def run(self, edit, register = '"'):
@@ -889,6 +915,9 @@ class ReplaceCharacter(sublime_plugin.TextCommand):
         for s in new_sel:
             self.view.sel().add(s)
 
+class CenterOnCursor(sublime_plugin.TextCommand):
+    def run(self, edit):
+        self.view.show_at_center(self.view.sel()[0])
 
 class ViIndent(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -907,8 +936,14 @@ class ViSetBookmark(sublime_plugin.TextCommand):
             "", "", sublime.PERSISTENT | sublime.HIDDEN)
 
 class ViSelectBookmark(sublime_plugin.TextCommand):
-    def run(self, edit, character):
+    def run(self, edit, character, select_bol=False):
         self.view.run_command('select_all_bookmarks', {'name': "bookmark_" + character})
+        if select_bol:
+            sels = list(self.view.sel())
+            self.view.sel().clear()
+            for r in sels:
+                start = self.view.line(r.a).begin()
+                self.view.sel().add(sublime.Region(start, start))
 
 g_macro_target = None
 
@@ -945,3 +980,12 @@ class ShowAsciiInfo(sublime_plugin.TextCommand):
         c = self.view.substr(self.view.sel()[0].end())
         sublime.status_message("<%s> %d, Hex %s, Octal %s" %
                         (c, ord(c), hex(ord(c))[2:], oct(ord(c))))
+
+class ViReverseSelectionsDirection(sublime_plugin.TextCommand):
+    def run(self, edit):
+        new_sels = []
+        for s in self.view.sel():
+            new_sels.append(sublime.Region(s.b, s.a))
+        self.view.sel().clear()
+        for s in new_sels:
+            self.view.sel().add(s)

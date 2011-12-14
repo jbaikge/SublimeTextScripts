@@ -143,6 +143,7 @@
                 [
                     { "command": "indent" },
                     { "command": "unindent" },
+                    { "command": "reindent", "args": {"single_line": false} },
                     { "command": "swap_line_up" },
                     { "command": "swap_line_down" },
                     { "command": "duplicate_line" },
@@ -354,7 +355,6 @@
             { "command": "show_panel", "args": {"panel": "replace"}, "caption": "Replace" },
             { "caption": "-" },
             { "command": "show_panel", "args": {"panel": "find_in_files"}, "caption": "Find in Files" },
-            { "command": "show_panel", "args": {"panel": "find_in_files", "location": "<open files>", "include": ""}, "caption": "Find in Open Files" },
             {
                 "caption": "Find Results",
                 "mnemonic": "R",
@@ -546,7 +546,7 @@
                 [
                     { "command": "set_line_ending", "args": {"type": "windows"}, "caption": "Windows", "checkbox": true },
                     { "command": "set_line_ending", "args": {"type": "unix"}, "caption": "Unix", "checkbox": true },
-                    { "command": "set_line_ending", "args": {"type": "mac"}, "caption": "Mac OS 9", "checkbox": true }
+                    { "command": "set_line_ending", "args": {"type": "cr"}, "caption": "Mac OS 9", "checkbox": true }
                 ]
             },
             { "caption": "-", "id": "settings" },
@@ -675,7 +675,6 @@
             { "command": "close_folder_list", "caption": "Remove all Folders from Project", "mnemonic": "m" },
             { "command": "refresh_folder_list", "caption": "Refresh Folders", "mnemonic": "e" },
             { "caption": "-" },
-            { "command": "show_panel", "args": {"panel": "find_in_files", "location": "<open folders>" }, "caption": "Find in Project", "mnemonic": "F" },
             { "caption": "-", "id": "end" }
         ]
     },

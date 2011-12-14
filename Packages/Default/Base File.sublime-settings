@@ -30,6 +30,9 @@
 	// Fold buttons are the triangles shown in the gutter to fold regions of text
 	"fold_buttons": true,
 
+	// Hides the fold buttons unless the mouse is over the gutter
+	"fade_fold_buttons": true,
+
 	// Columns in which to display vertical rulers
 	"rulers": [],
 
@@ -153,6 +156,10 @@
 	// ASCII, UTF-8 and UTF-16 encodings will be automatically detected.
 	"fallback_encoding": "Western (Windows 1252)",
 
+	// Encoding used when saving new files. Existing files ignore this, instead
+	// preserving the encoding they were opened with.
+	"default_encoding": "UTF-8",
+
 	// Determines what character(s) are used to terminate each line in new files.
 	// Valid values are 'system' (whatever the OS uses), 'windows' (CRLF) and
 	// 'unix' (LF only).
@@ -173,5 +180,7 @@
 
 	// If true, the selected text will be copied into the find panel when it's
 	// shown.
+	// On OS X, this value is overridden in the platform specific settings, so
+	// you'll need to place this line in your user settings to override it.
 	"find_selected_text": true
 }
