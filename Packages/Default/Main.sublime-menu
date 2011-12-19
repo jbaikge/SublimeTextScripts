@@ -14,6 +14,8 @@
                 "mnemonic": "R",
                 "children":
                 [
+                    { "command": "reopen_last_file", "caption": "Reopen Closed File" },
+                    { "caption": "-" },
                     { "command": "open_recent_file", "args": {"index": 0 } },
                     { "command": "open_recent_file", "args": {"index": 1 } },
                     { "command": "open_recent_file", "args": {"index": 2 } },
@@ -42,6 +44,7 @@
                     { "caption": "UTF-8", "command": "reopen", "args": {"encoding": "utf-8" } },
                     { "caption": "UTF-16 LE", "command": "reopen", "args": {"encoding": "utf-16 le" } },
                     { "caption": "UTF-16 BE", "command": "reopen", "args": {"encoding": "utf-16 be" } },
+                    { "caption": "-" },
                     { "caption": "Western (Windows 1252)", "command": "reopen", "args": {"encoding": "Western (Windows 1252)" } },
                     { "caption": "Western (ISO 8859-1)", "command": "reopen", "args": {"encoding": "Western (ISO 8859-1)" } },
                     { "caption": "Western (ISO 8859-3)", "command": "reopen", "args": {"encoding": "Western (ISO 8859-3)" } },
@@ -69,7 +72,9 @@
                     { "caption": "Romanian (ISO 8859-16)", "command": "reopen", "args": {"encoding": "Romanian (ISO 8859-16)" } },
                     { "caption": "Turkish (Windows 1254)", "command": "reopen", "args": {"encoding": "Turkish (Windows 1254)" } },
                     { "caption": "Turkish (ISO 8859-9)", "command": "reopen", "args": {"encoding": "Turkish (ISO 8859-9)" } },
-                    { "caption": "Vietnamese (Windows 1258)", "command": "reopen", "args": {"encoding": "Vietnamese (Windows 1258)" } }
+                    { "caption": "Vietnamese (Windows 1258)", "command": "reopen", "args": {"encoding": "Vietnamese (Windows 1258)" } },
+                    { "caption": "-" },
+                    { "caption": "Hexadecimal", "command": "reopen", "args": {"encoding": "Hexadecimal" } }
                 ]
             },
             {

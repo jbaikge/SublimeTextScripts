@@ -6,6 +6,7 @@ and don't need to be repeated here. Anything listed here will take precedence, h
 	{ "keys": ["super+shift+n"], "command": "new_window" },
 	{ "keys": ["super+shift+w"], "command": "close_window" },
 	{ "keys": ["super+o"], "command": "prompt_open_file" },
+	{ "keys": ["super+shift+t"], "command": "reopen_last_file" },
 	{ "keys": ["super+alt+up"], "command": "switch_file", "args": {"extensions": ["cpp", "cxx", "cc", "c", "hpp", "hxx", "h", "ipp", "inl", "m", "mm"]} },
 	{ "keys": ["super+n"], "command": "new_file" },
 	{ "keys": ["super+s"], "command": "save" },
@@ -90,6 +91,12 @@ and don't need to be repeated here. Anything listed here will take precedence, h
 			{ "key": "setting.tab_completion", "operator": "equal", "operand": true }
 		]
 	},
+	{ "keys": ["tab"], "command": "replace_completion_with_next_completion", "context":
+		[
+			{ "key": "last_command", "operator": "equal", "operand": "insert_best_completion" },
+			{ "key": "setting.tab_completion", "operator": "equal", "operand": true }
+		]
+	},
 	{ "keys": ["tab"], "command": "reindent", "context":
 		[
 			{ "key": "setting.auto_indent", "operator": "equal", "operand": true },
@@ -123,6 +130,12 @@ and don't need to be repeated here. Anything listed here will take precedence, h
 	{ "keys": ["shift+tab"], "command": "unindent", "context":
 		[
 			{ "key": "text", "operator": "regex_contains", "operand": "\n" }
+		]
+	},
+	{ "keys": ["shift+tab"], "command": "replace_completion_with_prev_completion", "context":
+		[
+			{ "key": "last_command", "operator": "equal", "operand": "insert_best_completion" },
+			{ "key": "setting.tab_completion", "operator": "equal", "operand": true }
 		]
 	},
 	{ "keys": ["shift+tab"], "command": "prev_field", "context":
