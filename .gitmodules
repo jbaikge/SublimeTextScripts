@@ -10,3 +10,6 @@
 [submodule "Packages/TrafPaste"]
 	path = Packages/TrafPaste
 	url = git://zeeb.us.to/TrafPaste
+[submodule "Packages/Subversion"]
+	path = Packages/Subversion
+	url = git://github.com/burriko/sublime-subversion.git
