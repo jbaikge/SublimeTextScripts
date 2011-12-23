@@ -344,6 +344,72 @@
                 <string>#E6DB74</string>
             </dict>
         </dict>
+        <dict>
+            <key>name</key>
+            <string>Raw Markup</string>
+            <key>scope</key>
+            <string>markup.raw</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#8C8C8C</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Block Quote</string>
+            <key>scope</key>
+            <string>markup.quote</string>
+            <key>settings</key>
+            <dict>
+                <key>background</key>
+                <string>#004480</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>List</string>
+            <key>scope</key>
+            <string>markup.list</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#FD971F</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Bold Markup</string>
+            <key>scope</key>
+            <string>markup.bold</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#A6E22E</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Italic Markup</string>
+            <key>scope</key>
+            <string>markup.italic</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#A6E22E</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Heading Markup</string>
+            <key>scope</key>
+            <string>markup.heading</string>
+            <key>settings</key>
+            <dict>
+                <key>foreground</key>
+                <string>#AE81FF</string>
+            </dict>
+        </dict>
     </array>
     <key>uuid</key>
     <string>5EAF4173-5DDE-4D64-A1E8-C1671C7EE339</string>
