@@ -1,0 +1,57 @@
+[
+	  { "keys": ["shift+alt+a"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "add",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+c"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "commit",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+d"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "delete",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+f"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "diff",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+r"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "revert",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+s"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "status",
+	  		"on_file":	   "False"
+	  	}
+	  },
+
+	  { "keys": ["shift+alt+u"], 
+	  	"command": "subversion",
+	  	"args": {
+	  		"svn_command": "update",
+	  		"on_file":	   "False"
+	  	}
+	  }
+]
