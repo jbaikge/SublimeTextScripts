@@ -543,6 +543,12 @@
     },
 
     {
+        "class": "grid_layout_control",
+        "border_size": 0,
+        "border_color": [24, 24, 24]
+    },
+
+    {
         "class": "icon_regex",
         "layer0.texture": "Theme - Default/icons/find_regex.png",
         "layer0.opacity": 1.0,

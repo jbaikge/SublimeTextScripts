@@ -165,8 +165,8 @@ and don't need to be repeated here. Anything listed here will take precedence, h
 	{ "keys": ["super+enter"], "command": "run_macro_file", "args": {"file": "Packages/Default/Add Line.sublime-macro"} },
 	{ "keys": ["super+shift+enter"], "command": "run_macro_file", "args": {"file": "Packages/Default/Add Line Before.sublime-macro"} },
 
-	{ "keys": ["super+p"], "command": "show_overlay", "args": {"overlay": "goto", "show_files": true} },
 	{ "keys": ["super+t"], "command": "show_overlay", "args": {"overlay": "goto", "show_files": true} },
+	{ "keys": ["super+p"], "command": "show_overlay", "args": {"overlay": "goto", "show_files": true} },
 	{ "keys": ["super+shift+p"], "command": "show_overlay", "args": {"overlay": "command_palette"} },
 	{ "keys": ["super+ctrl+p"], "command": "prompt_select_project" },
 	{ "keys": ["super+r"], "command": "show_overlay", "args": {"overlay": "goto", "text": "@"} },

@@ -27,13 +27,13 @@
 	{ "keys": ["ctrl+u"], "command": "soft_undo" },
 	{ "keys": ["ctrl+shift+u"], "command": "soft_redo" },
 
-	{ "keys": ["ctrl+x"], "command": "cut" },
-	{ "keys": ["ctrl+c"], "command": "copy" },
-	{ "keys": ["ctrl+v"], "command": "paste" },
 	{ "keys": ["ctrl+shift+v"], "command": "paste_and_indent" },
 	{ "keys": ["shift+delete"], "command": "cut" },
 	{ "keys": ["ctrl+insert"], "command": "copy" },
 	{ "keys": ["shift+insert"], "command": "paste" },
+	{ "keys": ["ctrl+x"], "command": "cut" },
+	{ "keys": ["ctrl+c"], "command": "copy" },
+	{ "keys": ["ctrl+v"], "command": "paste" },
 
 	{ "keys": ["left"], "command": "move", "args": {"by": "characters", "forward": false} },
 	{ "keys": ["right"], "command": "move", "args": {"by": "characters", "forward": true} },
