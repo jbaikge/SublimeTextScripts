@@ -101,6 +101,9 @@
 
     { "caption": "Rot13 Selection", "command": "rot13" },
 
+    { "caption": "Sort Lines", "command": "sort_lines", "args": {"case_sensitive": false} },
+    { "caption": "Sort Lines (Case Sensitive)", "command": "sort_lines", "args": {"case_sensitive": true} },
+
     { "caption": "Code Folding: Unfold All", "command": "unfold_all" },
     { "caption": "Code Folding: Fold Tag Attributes", "command": "fold_tag_attributes" },
 

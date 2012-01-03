@@ -137,7 +137,7 @@
 
 	// Controls how the indent guides are drawn, valid options are
 	// "draw_normal" and "draw_active".
-	"indent_guide_options": ["draw_normal", "draw_active"],
+	"indent_guide_options": ["draw_normal"],
 
 	// Set to true to removing trailing white space on save
 	"trim_trailing_white_space_on_save": false,
@@ -180,6 +180,9 @@
 
 	// Controls what scopes auto complete will be triggered in
 	"auto_complete_selector": "source - comment",
+
+	// Additional situations to trigger auto complete in
+	"auto_complete_triggers": [ {"selector": "text.html", "characters": "<"} ],
 
 	// By default, shift+tab will only unindent if the selection spans
 	// multiple lines. When pressing shift+tab at other times, it'll insert a
