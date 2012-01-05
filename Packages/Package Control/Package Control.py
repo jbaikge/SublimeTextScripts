@@ -84,7 +84,13 @@ class ChannelProvider():
         self.fetch_channel()
         if self.channel_info == False:
             return False
-        return self.channel_info['package_name_map']
+        return self.channel_info.get('package_name_map', {})
+
+    def get_renamed_packages(self):
+        self.fetch_channel()
+        if self.channel_info == False:
+            return False
+        return self.channel_info.get('renamed_packages', {})
 
     def get_repositories(self):
         self.fetch_channel()
@@ -406,7 +412,6 @@ class CliDownloader():
         return output
 
 
-
 class UrlLib2Downloader():
     def __init__(self, settings):
         self.settings = settings
@@ -570,6 +575,7 @@ class CurlDownloader(CliDownloader):
         return False
 
 _channel_repository_cache = {}
+
 
 class RepositoryDownloader(threading.Thread):
     def __init__(self, package_manager, name_map, repo):
@@ -765,7 +771,7 @@ class PackageManager():
                 'git_binary', 'git_update_command', 'hg_binary',
                 'hg_update_command', 'http_proxy', 'https_proxy',
                 'auto_upgrade_ignore', 'auto_upgrade_frequency',
-                'submit_usage', 'submit_url']:
+                'submit_usage', 'submit_url', 'renamed_packages']:
             if settings.get(setting) == None:
                 continue
             self.settings[setting] = settings.get(setting)
@@ -779,7 +785,7 @@ class PackageManager():
             # versioning based on commit dates
             if re.match('\d{4}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}', v):
                 v = '0.' + v
-            return [int(x) for x in re.sub(r'(\.0+)*$','', v).split(".")]
+            return [int(x) for x in re.sub(r'(\.0+)*$', '', v).split(".")]
         return cmp(normalize(version1), normalize(version2))
 
     def download_url(self, url, error_message):
@@ -829,12 +835,35 @@ class PackageManager():
                     time.time():
                 channel_repositories = repositories_cache.get('data')
 
-            if not channel_repositories:
+            name_map_cache_key = channel + '.package_name_map'
+            name_map_cache = _channel_repository_cache.get(
+                name_map_cache_key)
+            if name_map_cache and name_map_cache.get('time') > \
+                    time.time():
+                name_map = name_map_cache.get('data')
+                name_map.update(self.settings.get('package_name_map', {}))
+                self.settings['package_name_map'] = name_map
+
+            renamed_cache_key = channel + '.renamed_packages'
+            renamed_cache = _channel_repository_cache.get(
+                renamed_cache_key)
+            if renamed_cache and renamed_cache.get('time') > \
+                    time.time():
+                renamed_packages = renamed_cache.get('data')
+                renamed_packages.update(self.settings.get('renamed_packages',
+                    {}))
+                self.settings['renamed_packages'] = renamed_packages
+
+            if channel_repositories == None or \
+                    self.settings.get('package_name_map') == None or \
+                    self.settings.get('renamed_packages') == None:
                 for provider_class in _channel_providers:
                     provider = provider_class(channel, self)
                     if provider.match_url(channel):
                         break
+
                 channel_repositories = provider.get_repositories()
+
                 if channel_repositories == False:
                     continue
                 _channel_repository_cache[cache_key] = {
@@ -852,10 +881,26 @@ class PackageManager():
                             300),
                         'data': provider.get_packages(repo)
                     }
+
                 # Have the local name map override the one from the channel
                 name_map = provider.get_name_map()
-                name_map.update(self.settings['package_name_map'])
+                name_map.update(self.settings.get('package_name_map', {}))
                 self.settings['package_name_map'] = name_map
+                _channel_repository_cache[name_map_cache_key] = {
+                    'time': time.time() + self.settings.get('cache_length',
+                        300),
+                    'data': name_map
+                }
+
+                renamed_packages = provider.get_renamed_packages()
+                renamed_packages.update(self.settings.get('renamed_packages',
+                    {}))
+                self.settings['renamed_packages'] = renamed_packages
+                _channel_repository_cache[renamed_cache_key] = {
+                    'time': time.time() + self.settings.get('cache_length',
+                        300),
+                    'data': renamed_packages
+                }
 
             repositories.extend(channel_repositories)
         return repositories
@@ -889,6 +934,7 @@ class PackageManager():
 
         def schedule(downloader, delay):
             downloader.has_started = False
+
             def inner():
                 downloader.start()
                 downloader.has_started = True
@@ -1080,32 +1126,12 @@ class PackageManager():
                 shutil.rmtree(package_backup_dir)
                 return False
 
-        # Here we clean out the directory to preven issues with old files
-        # however don't just recursively delete the whole package dir since
-        # that will fail on Windows if a user has explorer open to it
-        def slow_delete(function, path, excinfo):
-            if function == os.remove:
-                time.sleep(0.2)
-                os.remove(path)
-        try:
-            for path in os.listdir(package_dir):
-                full_path = os.path.join(package_dir, path)
-                if os.path.isdir(full_path):
-                    shutil.rmtree(full_path, onerror=slow_delete)
-                else:
-                    os.remove(full_path)
-        except (OSError, IOError) as (exception):
-            sublime.error_message(__name__ + ': An error occurred while' +
-                ' trying to remove the package directory for %s. %s' %
-                (package_name, str(exception)))
-            return False
-
         package_zip = zipfile.ZipFile(package_path, 'r')
         root_level_paths = []
         last_path = None
         for path in package_zip.namelist():
             last_path = path
-            if path.find('/') in [len(path)-1, -1]:
+            if path.find('/') in [len(path) - 1, -1]:
                 root_level_paths.append(path)
             if path[0] == '/' or path.find('..') != -1:
                 sublime.error_message(__name__ + ': The package ' +
@@ -1114,15 +1140,22 @@ class PackageManager():
                 return False
 
         if last_path and len(root_level_paths) == 0:
-            root_level_paths.append(last_path[0:last_path.find('/')+1])
+            root_level_paths.append(last_path[0:last_path.find('/') + 1])
 
         os.chdir(package_dir)
 
         # Here we don’t use .extractall() since it was having issues on OS X
         skip_root_dir = len(root_level_paths) == 1 and \
             root_level_paths[0].endswith('/')
+        extracted_paths = []
         for path in package_zip.namelist():
             dest = path
+            try:
+                if not isinstance(dest, unicode):
+                    dest = unicode(dest, 'utf-8', 'strict')
+            except (UnicodeDecodeError):
+                dest = unicode(dest, 'cp1252', 'replace')
+
             if os.name == 'nt':
                 regex = ':|\*|\?|"|<|>|\|'
                 if re.search(regex, dest) != None:
@@ -1130,21 +1163,36 @@ class PackageManager():
                         'named %s due to an invalid filename') % (__name__,
                         path)
                     continue
-            regex = '[\x00-\x1F\x7F-\xFF]'
-            if re.search(regex, dest) != None:
-                dest = dest.decode('utf-8')
+
             # If there was only a single directory in the package, we remove
             # that folder name from the paths as we extract entries
             if skip_root_dir:
                 dest = dest[len(root_level_paths[0]):]
+
+            if os.name == 'nt':
+                dest = dest.replace('/', '\\')
+            else:
+                dest = dest.replace('\\', '/')
+
             dest = os.path.join(package_dir, dest)
+
+            def add_extracted_dirs(dir):
+                while dir not in extracted_paths:
+                    extracted_paths.append(dir)
+                    dir = os.path.dirname(dir)
+                    if dir == package_dir:
+                        break
+
             if path.endswith('/'):
                 if not os.path.exists(dest):
                     os.makedirs(dest)
+                add_extracted_dirs(dest)
             else:
                 dest_dir = os.path.dirname(dest)
                 if not os.path.exists(dest_dir):
                     os.makedirs(dest_dir)
+                add_extracted_dirs(dest_dir)
+                extracted_paths.append(dest)
                 try:
                     open(dest, 'wb').write(package_zip.read(path))
                 except (IOError, UnicodeDecodeError):
@@ -1152,6 +1200,26 @@ class PackageManager():
                         'named %s due to an invalid filename') % (__name__,
                         path)
         package_zip.close()
+
+        # Here we clean out any files that were not just overwritten
+        try:
+            for root, dirs, files in os.walk(package_dir, topdown=False):
+                paths = [os.path.join(root, f) for f in files]
+                paths.extend([os.path.join(root, d) for d in dirs])
+
+                for path in paths:
+                    if path in extracted_paths:
+                        continue
+                    if os.path.isdir(path):
+                        os.rmdir(path)
+                    else:
+                        os.remove(path)
+
+        except (OSError, IOError) as (e):
+            sublime.error_message(('%s: An error occurred while trying to ' +
+                'remove old files from the %s directory. %s') %
+                (__name__, package_name, str(e)))
+            return False
 
         self.print_messages(package_name, package_dir, is_upgrade, old_version)
 
@@ -1273,7 +1341,6 @@ class PackageManager():
 
             write(output)
         sublime.set_timeout(print_to_panel, 1)
-
 
     def remove_package(self, package_name):
         installed_packages = self.list_packages()
@@ -1571,6 +1638,7 @@ class InstallPackageThread(threading.Thread, PackageInstaller):
     def run(self):
         self.package_list = self.make_package_list(['upgrade', 'downgrade',
             'reinstall', 'pull', 'none'])
+
         def show_quick_panel():
             if not self.package_list:
                 sublime.error_message(__name__ + ': There are no packages ' +
@@ -1603,6 +1671,7 @@ class UpgradePackageThread(threading.Thread, PackageInstaller):
     def run(self):
         self.package_list = self.make_package_list(['install', 'reinstall',
             'none'])
+
         def show_quick_panel():
             if not self.package_list:
                 sublime.error_message(__name__ + ': There are no packages ' +
@@ -1711,6 +1780,7 @@ class ListPackagesThread(threading.Thread, ExistingPackagesCommand):
         if picked == -1:
             return
         package_name = self.package_list[picked][0]
+
         def open_dir():
             self.window.run_command('open_dir',
                 {"dir": os.path.join(sublime.packages_path(), package_name)})
@@ -1761,6 +1831,7 @@ class RemovePackageThread(threading.Thread):
 
     def run(self):
         self.result = self.manager.remove_package(self.package)
+
         def unignore_package():
             settings = sublime.load_settings('Global.sublime-settings')
             settings.set('ignored_packages', self.ignored_packages)
@@ -1872,8 +1943,9 @@ class EnablePackageCommand(sublime_plugin.WindowCommand):
 class AutomaticUpgrader(threading.Thread):
     def __init__(self, found_packages):
         self.installer = PackageInstaller()
+        self.settings_file = '%s.sublime-settings' % __name__
 
-        settings = sublime.load_settings(__name__ + '.sublime-settings')
+        settings = sublime.load_settings(self.settings_file)
         self.installed_packages = settings.get('installed_packages', [])
 
         self.auto_upgrade = settings.get('auto_upgrade')
@@ -1894,7 +1966,7 @@ class AutomaticUpgrader(threading.Thread):
 
         if self.auto_upgrade and self.next_run <= time.time():
             settings.set('auto_upgrade_last_run', int(time.time()))
-            sublime.save_settings(__name__ + '.sublime-settings')
+            sublime.save_settings(self.settings_file)
 
         threading.Thread.__init__(self)
 
@@ -1921,6 +1993,19 @@ class AutomaticUpgrader(threading.Thread):
                 'reinstall', 'downgrade', 'overwrite', 'none'],
                 ignore_packages=self.auto_upgrade_ignore)
 
+            # If Package Control is being upgraded, just do that and restart
+            for package in packages:
+                if package[0] != __name__:
+                    continue
+
+                def reset_last_run():
+                    settings = sublime.load_settings(self.settings_file)
+                    settings.set('auto_upgrade_last_run', None)
+                    sublime.save_settings(self.settings_file)
+                sublime.set_timeout(reset_last_run, 1)
+                packages = [package]
+                break
+
             if not packages:
                 print __name__ + ': No updated packages'
                 return
@@ -1939,27 +2024,35 @@ class PackageCleanup(threading.Thread):
     def __init__(self):
         self.manager = PackageManager()
         self.settings = sublime.load_settings(__name__ + '.sublime-settings')
+
         self.installed_packages = self.settings.get('installed_packages', [])
         if not self.installed_packages:
             self.installed_packages = []
         self.original_installed_packages = list(self.installed_packages)
+
+        # Fetch the repo info that includes the renamed packages list
+        self.manager.list_repositories()
+        self.renamed_packages = self.manager.settings.get('renamed_packages',
+            {})
+        if not self.renamed_packages:
+            self.renamed_packages = {}
+
         threading.Thread.__init__(self)
 
     def run(self):
         found_packages = []
         for package_name in os.listdir(sublime.packages_path()):
             package_dir = os.path.join(sublime.packages_path(), package_name)
+            metadata_path = os.path.join(package_dir, 'package-metadata.json')
+
+            # Cleanup packages that could not be removed due to in-use files
             if os.path.exists(os.path.join(package_dir,
                     'package-control.cleanup')):
                 shutil.rmtree(package_dir)
                 print __name__ + ': Removed old directory for package %s' % \
                     package_name
 
-            if os.path.exists(package_dir):
-                found_packages.append(package_name)
-
             # This adds previously installed packages from old versions of PC
-            metadata_path = os.path.join(package_dir, 'package-metadata.json')
             if os.path.exists(metadata_path) and \
                     package_name not in self.installed_packages:
                 self.installed_packages.append(package_name)
@@ -1971,17 +2064,41 @@ class PackageCleanup(threading.Thread):
                 }
                 self.manager.record_usage(params)
 
+            recorded_as_found = False
+
+            # Rename directories for packages that have changed names
+            if os.path.exists(metadata_path) and \
+                    package_name in self.renamed_packages:
+                new_package_name = self.renamed_packages[package_name]
+                new_package_dir = os.path.join(sublime.packages_path(),
+                    new_package_name)
+                if not os.path.exists(new_package_dir):
+                    os.rename(package_dir, new_package_dir)
+                    found_packages.append(new_package_name)
+                    self.installed_packages.append(new_package_name)
+                    try:
+                        self.installed_packages.remove(package_name)
+                    except (ValueError):
+                        pass
+                    recorded_as_found = True
+
+            if not recorded_as_found and os.path.exists(package_dir):
+                found_packages.append(package_name)
+
         def save_packages():
             installed_packages = list(set(self.installed_packages))
             self.installed_packages = sorted(installed_packages,
                 key=lambda s: s.lower())
+
             if self.installed_packages != self.original_installed_packages:
                 self.settings.set('installed_packages',
                     self.installed_packages)
                 sublime.save_settings(__name__ + '.sublime-settings')
+
             sublime.set_timeout(
                 lambda: AutomaticUpgrader(found_packages).start(), 10)
         sublime.set_timeout(save_packages, 10)
 
-
-PackageCleanup().start()
+# Start shortly after Sublime starts so package renames don't cause errors
+# with keybindings, settings, etc disappearing in the middle of parsing
+sublime.set_timeout(lambda: PackageCleanup().start(), 2000)
