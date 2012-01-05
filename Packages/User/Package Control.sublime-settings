@@ -2,6 +2,7 @@
 	"auto_upgrade_last_run": 1325596594,
 	"installed_packages":
 	[
+		"Change Tracker",
 		"Package Control"
 	]
 }
