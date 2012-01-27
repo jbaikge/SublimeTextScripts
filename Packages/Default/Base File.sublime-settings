@@ -14,8 +14,8 @@
 	"font_face": "",
 	"font_size": 10,
 
-	// Valid options are "bold", "italic", "no_antialias", "gray_antialias",
-	// and "subpixel_antialias".
+	// Valid options are "no_bold", "no_italic", "no_antialias", "gray_antialias",
+	// "subpixel_antialias" and "no_round" (OS X only)
 	"font_options": [],
 
 	// Characters that are considered to separate words
@@ -26,6 +26,9 @@
 
 	// Set to false to hide the gutter altogether
 	"gutter": true,
+
+	// Spacing between the gutter and the text
+	"margin": 4,
 
 	// Fold buttons are the triangles shown in the gutter to fold regions of text
 	"fold_buttons": true,
@@ -72,10 +75,10 @@
 	// level
 	"indent_subsequent_lines": true,
 
-	// Set to true to draw text centered in the window rather than left aligned
+	// Draws text centered in the window rather than left aligned
 	"draw_centered": false,
 
-	// Set to false to stop auto pairing quotes, brackets etc
+	// Controls auto pairing of quotes, brackets etc
 	"auto_match_enabled": true,
 
 	// Word list to use for spell checking
@@ -86,7 +89,7 @@
 	// the color scheme
 	"draw_minimap_border": false,
 
-	// Set to false to disable highlighting any line with a caret
+	// If enabled, will highlight any line with a caret
 	"highlight_line": false,
 
 	// Valid values are "smooth", "phase", "blink", "wide" and "solid".
@@ -125,6 +128,12 @@
 	// you'll need to place this line in your user settings to override it.
 	"scroll_past_end": true,
 
+	// This controls what happens when pressing up or down when on the first
+	// or last line.
+	// On OS X, this value is overridden in the platform specific settings, so
+	// you'll need to place this line in your user settings to override it.
+	"move_to_limit_on_up_down": false,
+
 	// Set to "none" to turn off drawing white space, "selection" to draw only the
 	// white space within the selection, and "all" to draw all white space
 	"draw_white_space": "selection",
@@ -136,7 +145,8 @@
 	"draw_indent_guides": true,
 
 	// Controls how the indent guides are drawn, valid options are
-	// "draw_normal" and "draw_active".
+	// "draw_normal" and "draw_active". draw_active will draw the indent
+	// guides containing the caret in a different color.
 	"indent_guide_options": ["draw_normal"],
 
 	// Set to true to removing trailing white space on save
@@ -184,8 +194,18 @@
 	// Controls what scopes auto complete will be triggered in
 	"auto_complete_selector": "source - comment",
 
-	// Additional situations to trigger auto complete in
+	// Additional situations to trigger auto complete
 	"auto_complete_triggers": [ {"selector": "text.html", "characters": "<"} ],
+
+	// By default, auto complete will commit the current completion on enter.
+	// This setting can be used to make it complete on tab instead.
+	// Completing on tab is generally a superior option, as it removes
+	// ambiguity between committing the completion and inserting a newline.
+	"auto_complete_commit_on_tab": false,
+
+	// Controls if auto complete is shown when snippet fields are active.
+	// Only relevant if auto_complete_commit_on_tab is true.
+	"auto_complete_with_fields": false,
 
 	// By default, shift+tab will only unindent if the selection spans
 	// multiple lines. When pressing shift+tab at other times, it'll insert a

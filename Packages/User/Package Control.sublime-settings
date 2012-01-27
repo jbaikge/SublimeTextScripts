@@ -1,8 +1,10 @@
 {
-	"auto_upgrade_last_run": 1325775582,
+	"auto_upgrade_last_run": 1327328541,
 	"installed_packages":
 	[
+		"Alignment",
 		"Change Tracker",
-		"Package Control"
+		"Package Control",
+		"SCSS"
 	]
 }

@@ -28,5 +28,9 @@
 				"match_all": true
 			}
 		]
+	},
+	{
+		"keys": ["ctrl+shift+="],
+		"command": "alignment"
 	}
 ]
