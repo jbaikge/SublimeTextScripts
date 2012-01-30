@@ -21,6 +21,15 @@
         "command": "swap_case"
     },
 
+    { "command": "toggle_comment", "args": {"block": false}, "caption": "Toggle Comment" },
+    { "command": "toggle_comment", "args": {"block": true}, "caption": "Toggle Block Comment" },
+
+    { "command": "toggle_bookmark", "caption": "Bookmarks: Toggle" },
+    { "command": "next_bookmark", "caption": "Bookmarks: Select Next" },
+    { "command": "prev_bookmark", "caption": "Bookmarks: Select Previous" },
+    { "command": "clear_bookmarks", "caption": "Bookmarks: Clear All" },
+    { "command": "select_all_bookmarks", "caption": "Bookmarks: Select All" },
+
     { "caption": "Indentation: Convert to Tabs", "command": "unexpand_tabs", "args": {"set_translate_tabs": true} },
     { "caption": "Indentation: Convert to Spaces", "command": "expand_tabs", "args": {"set_translate_tabs": true} },
     { "caption": "Indentation: Reindent Lines", "command": "reindent", "args": {"single_line": false} },
