@@ -3,11 +3,13 @@
 	"color_scheme": "Packages/User/Monokai Soda.tmTheme",
 	"draw_white_space": "all",
 	"ensure_newline_at_eof_on_save": true,
-	"font_size": 10,
+	"font_size": 8,
+	"paste.key": "922df615b81dd5cc08a8",
 	"rulers":
 	[
 		80
 	],
 	"save_on_focus_lost": true,
+	"theme": "Soda Dark.sublime-theme",
 	"word_wrap": false
 }

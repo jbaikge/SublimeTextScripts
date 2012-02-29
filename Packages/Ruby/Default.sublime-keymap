@@ -1,8 +1,7 @@
 [
-	{ "keys": ["#"], "command": "insert_snippet", "args": {"contents": "#{$1}$0"}, "context":
+	{ "keys": ["#"], "command": "insert_snippet", "args": {"contents": "#{${1:$SELECTION}}$0"}, "context":
 		[
 			{ "key": "setting.auto_match_enabled", "operator": "equal", "operand": true },
-			{ "key": "selection_empty", "operator": "equal", "operand": true, "match_all": true },
 			{
 				"operand": "(string.quoted.double.ruby | string.interpolated.ruby) - string source",
 				"operator": "equal",

@@ -19,13 +19,14 @@
         )</string>
         <key>increaseIndentPattern</key>
         <string>(?x)
+        ^\s*
         &lt;(?!\?|area|base|br|col|frame|hr|html|img|input|link|meta|param|[^&gt;]*/&gt;)
           ([A-Za-z0-9]+)(?=\s|&gt;)\b[^&gt;]*&gt;(?!.*&lt;/\1&gt;)
         |&lt;!--(?!.*--&gt;)
         |&lt;\?php.+?\b(if|else(?:if)?|for(?:each)?|while)\b.*:(?!.*end\1)
         |\{[^}"']*$
         </string>
-        <key>indentNextLinePattern</key>
+        <key>bracketIndentNextLinePattern</key>
         <string>&lt;!DOCTYPE(?!.*&gt;)</string>
     </dict>
 </dict>
