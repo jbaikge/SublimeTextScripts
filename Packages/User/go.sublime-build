@@ -1,0 +1,8 @@
+{
+	"cmd": ["go", "test", "-v", "$file_path"],
+	"selector": "source.go",
+	"env": {
+		"GOPATH": "/home/jake/code/go/externals:/home/jake/code/go",
+		"PATH": "/home/jake/hg/go/bin:/home/jake/bin:/usr/bin"
+	}
+}
