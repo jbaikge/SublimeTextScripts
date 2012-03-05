@@ -1,45 +1,58 @@
 import sublime
+from something_borrowed.diff_match_patch.diff_match_patch import diff_match_patch
 import gscommon as gs
-from difflib import SequenceMatcher
 
 class MergeException(Exception):
 	pass
 
-def merge(view, offset, size, dst):
-	if size < 0:
-		size = view.size()
-	edit = view.begin_edit()
-	try:
-		_merge(view, edit, offset, size, dst)
-	except MergeException as (err, dirty):
-		def cb():
-			if dirty:
-				view.run_command('undo')
-			gs.notice("GsPatch", "Could not merge changes into the buffer, edit aborted: %s" % err)
-		sublime.set_timeout(cb, 0)
-		return err
-	finally:
-		view.end_edit(edit)
-	return ''
-
-def _merge(view, edit, offset, size, dst):
-	def src(start, end):
+def _merge(view, size, text, edit):
+	def ss(start, end):
 		return view.substr(sublime.Region(start, end))
+	dmp = diff_match_patch()
+	diffs = dmp.diff_main(ss(0, size), text)
+	dmp.diff_cleanupEfficiency(diffs)
+	i = 0
 	dirty = False
-	sm = SequenceMatcher(None, src(offset, offset+size), dst)
-	for tag, s1, s2, d1, d2 in sm.get_opcodes():
-		s1 += offset
-		s2 += offset
-		if tag == 'equal':
-			if src(s1, s2) != dst[d1:d2]:
+	for d in diffs:
+		k, s = d
+		l = len(s)
+		if k == 0:
+			# match
+			l = len(s)
+			if ss(i, i+l) != s:
 				raise MergeException('mismatch', dirty)
+			i += l
 		else:
 			dirty = True
-			if tag == 'replace':
-				view.replace(edit, sublime.Region(s1, s2), dst[d1:d2])
-			elif tag == 'insert':
-				view.insert(edit, s1, dst[d1:d2])
-			elif tag == 'delete':
-				view.erase(edit, sublime.Region(s1, s2))
+			if k > 0:
+				# insert
+				view.insert(edit, i, s)
+				i += l
 			else:
-				raise MergeException('unreachable', dirty)
+				# delete
+				if ss(i, i+l) != s:
+					raise MergeException('mismatch', dirty)
+				view.erase(edit, sublime.Region(i, i+l))
+	return dirty
+
+def merge(view, size, text):
+	try:
+		edit = view.begin_edit()
+		dirty = False
+		err = ''
+		vs = view.settings()
+		ttts = vs.get("translate_tabs_to_spaces")
+		vs.set("translate_tabs_to_spaces", False)
+		if size < 0:
+			size = view.size()
+		dirty = _merge(view, size, text, edit)
+	except MergeException as (err, d):
+		dirty = d
+		err = "Could not merge changes into the buffer, edit aborted: %s" % err
+	except Exception as ex:
+		err = "where ma bees at?: %s" % ex
+	finally:
+		view.end_edit(edit)
+		vs.set("translate_tabs_to_spaces", ttts)
+		return (dirty, err)
+
