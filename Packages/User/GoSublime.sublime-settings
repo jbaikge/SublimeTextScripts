@@ -4,8 +4,8 @@
 	// in values, $PATH and ${PATH} are replaced with
 	// the corresponding environment(PATH) variable, if it exists.
 	"env": {
-		"GOPATH": "/home/jake/code/go/externals:/home/jake/code/go",
-		"PATH": "/home/jake/code/go/bin:/home/jake/hg/go/bin:/home/jake/bin:/usr/bin"
+		"GOPATH": "/home/jake/code/goexts:/home/jake/code/gopath",
+		"PATH": "/home/jake/code/gopath/bin:/home/jake/code/goexts/bin:/home/jake/code/golang/bin:/home/jake/bin:/usr/bin"
 	},
 
 
@@ -49,7 +49,7 @@
 	"gslint_timeout": 500,
 
 	// whether or not to include snippets in the auto-completion list
-	"autocomplete_snippets": true,
+	"autocomplete_snippets": false,
 
 	// whether or not to include Test*, Benchmark* and Example* functions in the auto-completion list
 	"autocomplete_tests": false,
