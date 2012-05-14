@@ -1,5 +1,5 @@
 import sublime
-import subprocess, re
+import subprocess, re, os, threading
 from subprocess import Popen, PIPE
 
 try:
@@ -9,6 +9,21 @@ try:
 except (AttributeError):
 	STARTUP_INFO = None
 
+_sem = threading.Semaphore()
+_settings = {
+	"env": {},
+	"gscomplete_enabled": False,
+	"gocode_cmd": "",
+	"gofmt_cmd": "",
+	"fmt_enabled": False,
+	"gslint_enabled": False,
+	"gslint_cmd": [],
+	"gslint_timeout": 0,
+	"autocomplete_snippets": False,
+	"autocomplete_tests": False,
+	"margo_cmd": [],
+	"margo_addr": ""
+}
 
 GLOBAL_SNIPPETS = [
 	(u'func\tfunc {...} \u0282', 'func ${1:name}($2)$3 {\n\t$0\n}'),
@@ -53,9 +68,9 @@ GOOSES = [
 ]
 
 GOOSARCHES = []
-for os in GOOSES:
+for s in GOOSES:
 	for arch in GOARCHES:
-		GOOSARCHES.append('%s_%s' % (os, arch))
+		GOOSARCHES.append('%s_%s' % (s, arch))
 
 GOOSARCHES_PAT = re.compile(r'^(.+?)(?:_(%s))?(?:_(%s))?\.go$' % ('|'.join(GOOSES), '|'.join(GOARCHES)))
 
@@ -67,9 +82,10 @@ IGNORED_SCOPES = frozenset([
 	'comment.block.go'
 ])
 
-def runcmd(args, input=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False):
 	try:
-		p = Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE, startupinfo=STARTUP_INFO)
+		p = Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE,
+			startupinfo=STARTUP_INFO, env=env(), shell=shell)
 		if isinstance(input, unicode):
 			input = input.encode('utf-8')
 		out, err = p.communicate(input=input)
@@ -78,9 +94,12 @@ def runcmd(args, input=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
 		err = u'Error while running %s: %s' % (args[0], e)
 		return ("", err)
 
+def settings_obj():
+	return sublime.load_settings("GoSublime.sublime-settings")
+
 def setting(key, default=None):
-	s = sublime.load_settings("GoSublime.sublime-settings")
-	return s.get(key, default)
+	with _sem:
+		return _settings.get(key, default)
 
 def notice(domain, txt):
 	txt = "** %s: %s **" % (domain, txt)
@@ -108,3 +127,37 @@ def active_valid_go_view(win=None):
 
 def rowcol(view):
 	return view.rowcol(view.sel()[0].begin())
+
+def env():
+	e = os.environ.copy()
+	e.update(setting('env', {}))
+
+	roots = e.get('GOPATH', '').split(os.pathsep)
+	roots.append(e.get('GOROOT', ''))
+	add_path = e.get('PATH', '').split(os.pathsep)
+	for s in roots:
+		if s:
+			s = os.path.join(s, 'bin')
+			if s not in add_path:
+				add_path.append(s)
+	e['PATH'] = os.pathsep.join(add_path)
+	return e
+
+def sync_settings():
+	global _settings
+	so = settings_obj()
+	with _sem:
+		for k in _settings:
+			v = so.get(k, None)
+			if v is not None:
+				# todo: check the type of `v`
+				_settings[k] = v
+		e = {}
+		for k, v in _settings.get('env', {}).iteritems():
+			e[k] = str(os.path.expandvars(os.path.expanduser(v)))
+		_settings['env'] = e
+
+
+settings_obj().clear_on_change("GoSublime.settings")
+settings_obj().add_on_change("GoSublime.settings", sync_settings)
+sync_settings()
