@@ -1,0 +1,57 @@
+[
+	{
+		"caption": "GoSublime: Add/Remove package",
+		"command": "gs_palette",
+		"args": {"palette": "imports", "direct": true}
+	},
+	{
+		"caption": "GoSublime: List declarations",
+		"command": "gs_palette",
+		"args": {"palette": "declarations", "direct": true}
+	},
+	{
+		"caption": "GoSublime: Show errors",
+		"command": "gs_palette",
+		"args": {"palette": "errors", "direct": true}
+	},
+	{
+		"caption": "GoSublime: Go to last bookmark",
+		"command": "gs_palette",
+		"args": {"palette": "jump_back"}
+	},
+	{
+		"caption": "GoSublime: Go to imports section",
+		"command": "gs_palette",
+		"args": {"palette": "jump_to_imports"}
+	},
+	{
+		"caption": "GoSublime: Fmt and save",
+		"command": "gs_fmt_save"
+	},
+	{
+		"caption": "GoSublime: Fmt and save as ...",
+		"command": "gs_fmt_prompt_save_as"
+	},
+	{
+		"caption": "GoSublime: Open shell/build prompt",
+		"command": "gs_shell"
+	},
+	{
+		"caption": "GoSublime: Goto Definition",
+		"command": "gs_doc",
+		"args": {"mode": "goto"}
+	},
+	{
+		"caption": "GoSublime: Show documentation hint",
+		"command": "gs_doc",
+		"args": {"mode": "hint"}
+	},
+	{
+		"caption": "GoSublime: Fmt the current file (without saving it)",
+		"command": "gs_fmt"
+	},
+	{
+		"caption": "GoSublime: Install/Update MarGo and Gocode",
+		"command": "gs_update_deps"
+	}
+]

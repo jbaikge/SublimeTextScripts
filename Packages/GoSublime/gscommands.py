@@ -8,14 +8,12 @@ class GsCommentForwardCommand(sublime_plugin.TextCommand):
 
 class GsFmtSaveCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		if gs.is_go_source_view(self.view):
-			self.view.run_command("gs_fmt")
+		self.view.run_command("gs_fmt")
 		sublime.set_timeout(lambda: self.view.run_command("save"), 0)
 
 class GsFmtPromptSaveAsCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		if gs.is_go_source_view(self.view):
-			self.view.run_command("gs_fmt")
+		self.view.run_command("gs_fmt")
 		sublime.set_timeout(lambda: self.view.run_command("prompt_save_as"), 0)
 
 class GsGotoRowColCommand(sublime_plugin.TextCommand):

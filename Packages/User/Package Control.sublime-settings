@@ -1,10 +1,11 @@
 {
-	"auto_upgrade_last_run": 1336397302,
+	"auto_upgrade_last_run": 1339430662,
 	"installed_packages":
 	[
 		"Alignment",
 		"Change Tracker",
 		"GoSublime",
+		"LaTeXTools",
 		"Package Control",
 		"SCSS"
 	]

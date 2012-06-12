@@ -1,6 +1,6 @@
 import subprocess, httplib, urllib, json, traceback, os
 import sublime
-import gscommon as gs
+import gscommon as gs, gsdepends
 
 class Conn(object):
 	def __init__(self):
@@ -37,34 +37,14 @@ def post(path, a, default, fail_early=False):
 			"Content-type": "application/x-www-form-urlencoded",
 			"Accept": "application/json; charset=utf-8"
 		}
-
-		try:
-			resp = conn.post(path, params, headers)
-		except Exception:
-			if fail_early:
-				return (default, traceback.format_exc())
-
-			margo_cmd = list(gs.setting('margo_cmd', []))
-			if not margo_cmd:
-				err = 'Missing `margo_cmd`'
-				gs.notice("MarGo", err)
-				return (default, err)
-			margo_cmd.extend(["-d", "-addr", gs.setting('margo_addr', '')])
-			out, err = gs.runcmd(margo_cmd)
-
-			out = out.strip()
-			if out:
-				print('MarGo: started: %s' % out)
-
-			err = err.strip()
-			if err:
-				gs.notice('MarGo', err)
-			else:
-				resp = conn.post(path, params, headers)
-	except:
-		err = traceback.format_exc()
-		gs.notice("MarGo", err)
+		resp = conn.post(path, params, headers)
+	except Exception as ex:
+		err = 'MarGo: %s' % ex
+		# gsdepeds.hello calls us...
+		if not fail_early:
+			gsdepends.dispatch(gsdepends.hello)
 		return (default, err)
+
 	if not isinst(resp, {}):
 		resp = {}
 	if not isinst(resp.get("error"), u""):
@@ -77,14 +57,16 @@ def post(path, a, default, fail_early=False):
 
 def declarations(filename, src):
 	return post('/declarations', {
-		'fn': filename,
+		'fn': filename or '',
 		'src': src
 	}, [])
 
 def fmt(filename, src):
 	return post('/fmt', {
-		'fn': filename,
-		'src': src
+		'fn': filename or '',
+		'src': src,
+		'tab_indent': gs.setting('fmt_tab_indent'),
+		'tab_width': gs.setting('fmt_tab_width'),
 	}, u"")
 
 def hello(motd):
@@ -95,15 +77,37 @@ def bye_ni():
 
 def package(filename, src):
 	return post('/package', {
-		'fn': filename,
+		'fn': filename or '',
 		'src': src
 	}, {})
 
-def imports(filename, src, import_paths, toggle):
+def lint(filename, src):
+	return post('/lint', {
+		'fn': filename or '',
+		'src': src
+	}, [])
+
+def imports(filename, src, toggle):
 	return post('/imports', {
-		'fn': filename,
+		'fn': filename or '',
+		'src': src,
+		'toggle': toggle,
+		'tab_indent': gs.setting('fmt_tab_indent'),
+		'tab_width': gs.setting('fmt_tab_width'),
+	}, {})
+
+def import_paths(filename, src):
+	return post('/import_paths', {
+		'fn': filename or '',
 		'src': src,
 		'env': gs.env(),
-		'import_paths': import_paths,
-		'toggle': toggle,
 	}, {})
+
+def doc(filename, src, offset, expr):
+	return post('/doc', {
+		'fn': filename or '',
+		'src': src,
+		'offset': offset,
+		'env': gs.env(),
+		'expr': expr,
+	}, [])

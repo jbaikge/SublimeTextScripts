@@ -14,10 +14,10 @@ _settings = {
 	"env": {},
 	"gscomplete_enabled": False,
 	"gocode_cmd": "",
-	"gofmt_cmd": "",
 	"fmt_enabled": False,
+	"fmt_tab_indent": True,
+	"fmt_tab_width": 8,
 	"gslint_enabled": False,
-	"gslint_cmd": [],
 	"gslint_timeout": 0,
 	"autocomplete_snippets": False,
 	"autocomplete_tests": False,
@@ -25,13 +25,14 @@ _settings = {
 	"margo_addr": ""
 }
 
+GLOBAL_SNIPPET_PACKAGE = (u'package\tpackage [name] \u0282', 'package ${1:NAME}')
+GLOBAL_SNIPPET_IMPORT = (u'import\timport (...) \u0282', 'import (\n\t"$1"\n)')
 GLOBAL_SNIPPETS = [
+	GLOBAL_SNIPPET_IMPORT,
 	(u'func\tfunc {...} \u0282', 'func ${1:name}($2)$3 {\n\t$0\n}'),
 	(u'func\tfunc ([receiver]) {...} \u0282', 'func (${1:receiver} ${2:type}) ${3:name}($4)$5 {\n\t$0\n}'),
 	(u'var\tvar (...) \u0282', 'var (\n\t$1\n)'),
 	(u'const\tconst (...) \u0282', 'const (\n\t$1\n)'),
-	(u'import\timport (...) \u0282', 'import (\n\t"$1"\n)'),
-	(u'package\tpackage [name] \u0282', 'package ${1:NAME}')
 ]
 
 LOCAL_SNIPPETS = [
@@ -83,16 +84,25 @@ IGNORED_SCOPES = frozenset([
 ])
 
 def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False):
+	out = ""
+	err = ""
+	exc = None
+
+	old_env = os.environ.copy()
+	os.environ.update(env())
 	try:
 		p = Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE,
-			startupinfo=STARTUP_INFO, env=env(), shell=shell)
+			startupinfo=STARTUP_INFO, shell=shell)
 		if isinstance(input, unicode):
 			input = input.encode('utf-8')
 		out, err = p.communicate(input=input)
-		return (out.decode('utf-8') if out else '', err.decode('utf-8') if err else '')
-	except (OSError, ValueError) as e:
+		out = out.decode('utf-8') if out else ''
+		err = err.decode('utf-8') if err else ''
+	except (Exception) as e:
 		err = u'Error while running %s: %s' % (args[0], e)
-		return ("", err)
+		exc = e
+	os.environ.update(old_env)
+	return (out, err, exc)
 
 def settings_obj():
 	return sublime.load_settings("GoSublime.sublime-settings")
@@ -121,7 +131,7 @@ def active_valid_go_view(win=None):
 		win = sublime.active_window()
 	if win:
 		view = win.active_view()
-		if view and view.file_name() and is_go_source_view(view):
+		if view and is_go_source_view(view):
 			return view
 	return None
 
