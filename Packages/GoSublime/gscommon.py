@@ -1,5 +1,5 @@
 import sublime
-import subprocess, re, os, threading
+import subprocess, re, os, threading, tempfile
 from subprocess import Popen, PIPE
 
 try:
@@ -25,7 +25,10 @@ _settings = {
 	"margo_addr": ""
 }
 
-GLOBAL_SNIPPET_PACKAGE = (u'package\tpackage [name] \u0282', 'package ${1:NAME}')
+GLOBAL_SNIPPET_PACKAGE = [
+	(u'package\tpackage [name] \u0282', 'package ${1:NAME}'),
+	(u'package main\tpackage main \u0282', 'package main\n\nfunc main() {\n\t$0\n}\n')
+]
 GLOBAL_SNIPPET_IMPORT = (u'import\timport (...) \u0282', 'import (\n\t"$1"\n)')
 GLOBAL_SNIPPETS = [
 	GLOBAL_SNIPPET_IMPORT,
@@ -82,6 +85,19 @@ IGNORED_SCOPES = frozenset([
 	'comment.line.double-slash.go',
 	'comment.block.go'
 ])
+
+def temp_file(suffix='', prefix='', delete=True):
+	tmpdir = os.path.join(tempfile.gettempdir(), 'GoSublime')
+	try:
+		os.mkdir(tmpdir)
+	except Exception as ex:
+		pass
+	try:
+		f = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=tmpdir, delete=delete)
+	except Exception as ex:
+		return (None, 'Error: %s' % ex)
+	return (f, '')
+
 
 def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False):
 	out = ""
