@@ -5,9 +5,14 @@
 		"args": {"palette": "imports", "direct": true}
 	},
 	{
-		"caption": "GoSublime: List declarations",
+		"caption": "GoSublime: List File declarations",
 		"command": "gs_palette",
 		"args": {"palette": "declarations", "direct": true}
+	},
+	{
+		"caption": "GoSublime: List Package declarations",
+		"command": "gs_browse_declarations",
+		"args": {"dir": "."}
 	},
 	{
 		"caption": "GoSublime: Show errors",
@@ -67,5 +72,17 @@
 	{
 		"caption": "GoSublime: Install/Update MarGo and Gocode",
 		"command": "gs_update_deps"
+	},
+	{
+		"caption": "GoSublime: Browse Declarations",
+		"command": "gs_browse_declarations"
+	},
+	{
+		"caption": "GoSublime: Browse Packages",
+		"command": "gs_browse_packages"
+	},
+	{
+		"caption": "GoSublime: Run Tests",
+		"command": "gs_test"
 	}
 ]

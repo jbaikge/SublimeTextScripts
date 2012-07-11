@@ -110,7 +110,7 @@ class GsPaletteCommand(sublime_plugin.WindowCommand):
 			bks.append(loc)
 
 	def goto(self, loc):
-		self.window.open_file('%s:%d:%d' % (loc.fn, loc.row+1, loc.col+1), sublime.ENCODED_POSITION)
+		gs.focus(loc.fn, loc.row, loc.col)
 
 	def jump_to_imports(self):
 		view = gs.active_valid_go_view()
@@ -149,11 +149,16 @@ class GsPaletteCommand(sublime_plugin.WindowCommand):
 		fr = gslint.ref(view.file_name())
 		if fr:
 			reps = fr.reports.copy()
-		for k in sorted(reps.keys()):
-			r = reps[k]
-			loc = Loc(view.file_name(), r.row, r.col)
-			m = "%sline %d: %s" % (indent, r.row+1, r.msg)
-			self.add_item(m, self.jump_to, (view, loc))
+		keys = sorted(reps.keys())
+		if keys:
+			for k in keys:
+				r = reps[k]
+				loc = Loc(view.file_name(), r.row, r.col)
+				m = "%sline %d: %s" % (indent, r.row+1, r.msg)
+				self.add_item(m, self.jump_to, (view, loc))
+		else:
+			self.add_item(['', 'No errors to report'])
+
 
 	def palette_imports(self, view, direct=False):
 		indent = '' if direct else '    '
@@ -224,16 +229,24 @@ class GsPaletteCommand(sublime_plugin.WindowCommand):
 
 	def palette_declarations(self, view, direct=False):
 		indent = '' if direct else '    '
-		decls, err = margo.declarations(
+		res, err = margo.declarations(
 			view.file_name(),
 			view.substr(sublime.Region(0, view.size()))
 		)
 		if err:
 			gs.notice('GsDeclarations', err)
-		decls.sort(key=lambda v: v['line'])
-		for i, v in enumerate(decls):
-			if v['name'] == '_':
-				continue
-			loc = Loc(v['filename'], v['line']-1, v['column']-1)
-			prefix = u'%s%s \u00B7   ' % (indent, gs.CLASS_PREFIXES.get(v['kind'], ''))
-			self.add_item(prefix+v['name'], self.jump_to, (view, loc))
+		else:
+			decls = res.get('file_decls', [])
+			decls.sort(key=lambda v: v.get('row', 0))
+			added = 0
+			for i, v in enumerate(decls):
+				loc = Loc(v['fn'], v['row'], v['col'])
+				prefix = u'%s%s \u00B7   ' % (indent, gs.CLASS_PREFIXES.get(v['kind'], ''))
+				s = v['name']
+				if v['repr']:
+					s = v['repr']
+				self.add_item(prefix+s, self.jump_to, (view, loc))
+				added += 1
+
+		if added < 1:
+			self.add_item(['', 'No declarations found'])

@@ -55,11 +55,18 @@ def post(path, a, default, fail_early=False):
 			resp["error"] = "Invalid Data"
 	return (resp["data"], resp["error"])
 
-def declarations(filename, src):
+def declarations(filename, src, pkg_dir=''):
 	return post('/declarations', {
 		'fn': filename or '',
-		'src': src
-	}, [])
+		'src': src,
+		'env': gs.env(),
+		'pkg_dir': pkg_dir,
+	}, {})
+
+def pkgdirs():
+	return post('/pkgdirs', {
+		'env': gs.env(),
+	}, {})
 
 def fmt(filename, src):
 	return post('/fmt', {
@@ -103,11 +110,12 @@ def import_paths(filename, src):
 		'env': gs.env(),
 	}, {})
 
-def doc(filename, src, offset, expr):
+def doc(filename, src, offset):
 	return post('/doc', {
 		'fn': filename or '',
 		'src': src,
 		'offset': offset,
 		'env': gs.env(),
-		'expr': expr,
+		'tab_indent': gs.setting('fmt_tab_indent'),
+		'tab_width': gs.setting('fmt_tab_width'),
 	}, [])

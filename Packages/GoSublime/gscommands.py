@@ -1,5 +1,6 @@
 import sublime, sublime_plugin
-import gscommon as gs
+import gscommon as gs, margo
+import os
 
 class GsCommentForwardCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -19,14 +20,42 @@ class GsFmtPromptSaveAsCommand(sublime_plugin.TextCommand):
 class GsGotoRowColCommand(sublime_plugin.TextCommand):
 	def run(self, edit, row, col=0):
 		pt = self.view.text_point(row, col)
+		r = sublime.Region(pt, pt)
 		self.view.sel().clear()
-		self.view.sel().add(sublime.Region(pt))
+		self.view.sel().add(r)
 		self.view.show(pt)
+		dmn = 'gs.focus.%s:%s:%s' % (gs.view_fn(self.view), row, col)
+		flags = sublime.DRAW_EMPTY_AS_OVERWRITE
+		show = lambda: self.view.add_regions(dmn, [r], 'comment', 'bookmark', flags)
+		hide = lambda: self.view.erase_regions(dmn)
+
+		for i in range(3):
+			m = 300
+			s = i * m * 2
+			h = s + m
+			sublime.set_timeout(show, s)
+			sublime.set_timeout(hide, h)
 
 class GsNewGoFileCommand(sublime_plugin.WindowCommand):
 	def run(self):
-		def cb(s):
-			view = self.window.new_file()
-			view.set_name(s)
-			view.set_syntax_file('Packages/Go/Go.tmLanguage')
-		self.window.show_input_panel("Choose File Name", 'untitled.go', cb, None, None)
+		default_file_name = 'untitled.go'
+		pkg_name = 'main'
+		view = gs.active_valid_go_view()
+		basedir = gs.basedir_or_cwd(view and view.file_name())
+		for fn in os.listdir(basedir):
+			if fn.endswith('.go'):
+				name, _ = margo.package(os.path.join(basedir, fn), '')
+				if name and name.get('Name'):
+					pkg_name = name.get('Name')
+					break
+
+		view = self.window.new_file()
+		view.set_name(default_file_name)
+		view.set_syntax_file('Packages/Go/Go.tmLanguage')
+		edit = view.begin_edit()
+		try:
+			view.replace(edit, sublime.Region(0, view.size()), 'package %s\n' % pkg_name)
+			view.sel().clear()
+			view.sel().add(view.find(pkg_name, 0, sublime.LITERAL))
+		finally:
+			view.end_edit(edit)
