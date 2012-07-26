@@ -15,49 +15,33 @@
 	// the command that shall be called for gocode, this can be the command name
 	// or absolute path to a binary e.g. `/go/bin/gocode`
 	"gocode_cmd": "gocode",
-	
-	// the command that shall be called for gofmt, this can be the command name
-	// or absolute path to a binary e.g. `/go/bin/gofmt`
-	"gofmt_cmd": "gofmt",
-	
+
+	// Whether or not gsfmt is enabled
+	"fmt_enabled": true,
+
+	// whether or not to indent with tabs (alignment is always done using spaces)
+	"fmt_tab_indent": true,
+
+	// the assumed width of the tab character (or number of spaces to indent with)
+	"fmt_tab_width": 8,
+
 	// Whether or not gslint is enabled
 	"gslint_enabled": true,
 
-	// the command that shall be called for gslint
-	// the command shall output errors to stderr in the format: PATH:LINE_NUMBER:ERROR_OFFSET:ERROR_MESSAGE
-	// matching the regexp (.+):(\d+):(\d+):(.+) where ERROR_OFFSET is optional.
-	// e.g. given:
-	//     fmt.Println(x)
-	// the command shall output:
-	//     main.go:10:14: undeclared name: x
-	// compatible commands include: govet, gotype
-	// the following magic values are replaced in the command you specify
-	// 
-	// $pkg        the package name of the file in which the command was invoked
-	// $files      the list of project files
-	// $real_path  the origin path to file in which the command was invoked.
-	// $path       the path to the file in which the command was invoked.
-	//             This defers from $real_path in that it contains the contents
-	//             of the possibly unsaved view.
-	//             Its basename is of the form: .GoSublime~tmp~[VIEW_ID:\d+]~[basename($real_path)]~
-	// 
-	// 
-	// "gslint_cmd": ["govet", "$files"],
-	"gslint_cmd": ["go", "tool", "gotype", "-p", "$pkg", "$files"],
-
 	// how long to wait after the last keystroke before the gslint_cmd command is run (in milliseconds)
-	"gslint_timeout": 500,
+	"gslint_timeout": 100,
 
 	// whether or not to include snippets in the auto-completion list
-	"autocomplete_snippets": false,
+	"autocomplete_snippets": true,
 
 	// whether or not to include Test*, Benchmark* and Example* functions in the auto-completion list
 	"autocomplete_tests": false,
 
-	"margo_enabled": false,
 	"margo_cmd": ["MarGo"],
-	// the http address on which MarGo listen/should listen
+	// the tcp address on which MarGo listen/should listen
 	// if GoSublime can't connect to `margo_addr` it attempts to start MarGo
 	// with `margo_cmd` passing `margo_addr`
-	"margo_addr": "127.9.5.1:57951"
+	"margo_addr": "127.0.0.1:57951",
+
+	"auto_complete_triggers": [ {"selector": "source.go", "characters": "."} ]
 }

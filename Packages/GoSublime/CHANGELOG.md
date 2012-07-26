@@ -1,3 +1,32 @@
+## r12.07.21-2
+	* fix: handle filename for browse files correctly
+	    update MarGo
+
+## r12.07.21-1
+	* add support for browsing/listing the files in a the current package
+	    press `ctrl+dot`,`ctrl+m`
+	    update MarGo
+
+## r12.07.15-2
+	* add basic call-tip? support
+	* press `ctrl+dot`,`ctrl+space` inside a function parameter list to show its declaration
+
+## r12.07.15-1
+	* update gocode: nsf recently added improved support for variables declared in the head of `if` and `for` statements
+
+## r12.07.12-1
+	* fix: imports not sorted on fmt/save
+	* fix: GsDoc doesn't work correctly in unsaved files
+	* various presentation tweaks
+	* documentation comments are now displayed for types
+	* package documentation is now displayed
+	* goto definition of packages is now enabled
+	* various keybindings now available in non .go files
+	    `ctrl+dot`,`ctrl+dot` - open the command palette with only GoSublime entries
+	    `ctrl+dot`,`ctrl+n` - create a new .go file
+	    `ctrl+dot`,`ctrl+o` - browse packages
+	* update MarGo
+
 ## r12.07.08-2
 	* new quick panel for go test
 	    allows easily running `Test.*`, `Example.*`, `Benchmark.*` or individual tests, examples and benchmarks

@@ -139,8 +139,9 @@ class GsBrowsePackagesCommand(sublime_plugin.WindowCommand):
 			for dir, fn in dirs.iteritems():
 				if not m.get(dir):
 					m[dir] = fn
-		ents = sorted(m.keys())
+		ents = m.keys()
 		if ents:
+			ents.sort(key = lambda a: a.lower())
 			def cb(i):
 				if i >= 0:
 					fn = m[ents[i]]
@@ -148,5 +149,41 @@ class GsBrowsePackagesCommand(sublime_plugin.WindowCommand):
 			win.show_quick_panel(ents, cb)
 		else:
 			win.show_quick_panel([['', 'No source directories found']], lambda x: None)
+
+class GsBrowseFilesCommand(sublime_plugin.WindowCommand):
+	def is_enabled(self):
+		return gs.is_go_source_view(self.window.active_view())
+
+	def run(self):
+		win = self.window
+		view = gs.active_valid_go_view(win=win)
+		ents = []
+		m = {}
+		if view:
+			res, err = margo.pkgfiles(gs.basedir_or_cwd(view.file_name()))
+			if err:
+				gs.notice(DOMAIN, err)
+				return
+
+			if len(res) == 1:
+				for pkgname, filenames in res.iteritems():
+					for name, fn in filenames.iteritems():
+						m[name] = fn
+						ents.append(name)
+			else:
+				for pkgname, filenames in res.iteritems():
+					for name, fn in filenames.iteritems():
+						s = '(%s) %s' % (pkgname, name)
+						m[s] = fn
+						ents.append(s)
+
+		if ents:
+			ents.sort(key = lambda a: a.lower())
+			def cb(i):
+				if i >= 0:
+					gs.focus(m[ents[i]], 0, 0, win)
+			win.show_quick_panel(ents, cb)
+		else:
+			win.show_quick_panel([['', 'No files found']], lambda x: None)
 
 

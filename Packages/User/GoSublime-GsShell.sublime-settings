@@ -1,3 +1,10 @@
 {
+	"cmd_hist":
+	{
+		"/home/jake/code/gopath/src/github.com/jbaikge/gcalinvoice":
+		[
+			"go build"
+		]
+	},
 	"last_command": "go get -u -v github.com/nsf/gocode github.com/DisposaBoy/MarGo"
 }

@@ -12,7 +12,7 @@ class Conn(object):
 				self.c.close()
 			except:
 				pass
-		self.c = httplib.HTTPConnection(gs.setting('margo_addr', ''))
+		self.c = httplib.HTTPConnection(gs.setting('margo_addr', ''), timeout=5)
 
 	def post(self, path, p, h):
 		if not self.c:
@@ -66,6 +66,11 @@ def declarations(filename, src, pkg_dir=''):
 def pkgdirs():
 	return post('/pkgdirs', {
 		'env': gs.env(),
+	}, {})
+
+def pkgfiles(dirname):
+	return post('/pkgfiles', {
+		'path': dirname,
 	}, {})
 
 def fmt(filename, src):
