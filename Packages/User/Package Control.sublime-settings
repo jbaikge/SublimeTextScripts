@@ -1,8 +1,9 @@
 {
-	"auto_upgrade_last_run": 1343304178,
+	"auto_upgrade_last_run": 1344263133,
 	"installed_packages":
 	[
 		"Alignment",
+		"Git",
 		"GoSublime",
 		"LaTeXTools",
 		"LESS",
