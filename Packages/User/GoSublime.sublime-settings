@@ -1,47 +1,6 @@
 {
-	// you may set specific environment variables here
-	// e.g "env": { "PATH": "$HOME/go/bin:$PATH" }
-	// in values, $PATH and ${PATH} are replaced with
-	// the corresponding environment(PATH) variable, if it exists.
 	"env": {
-		"GOPATH": "/home/jake/code/goexts:/home/jake/code/gopath/src/funstimate:/home/jake/code/gopath",
-		"PATH": "/home/jake/code/gopath/bin:/home/jake/code/goexts/bin:/home/jake/code/golang/bin:/home/jake/bin:/usr/bin"
-	},
-
-
-	// Whether or not gscomplete(gocode) is enabled
-	"gscomplete_enabled": true,
-
-	// the command that shall be called for gocode, this can be the command name
-	// or absolute path to a binary e.g. `/go/bin/gocode`
-	"gocode_cmd": "gocode",
-
-	// Whether or not gsfmt is enabled
-	"fmt_enabled": true,
-
-	// whether or not to indent with tabs (alignment is always done using spaces)
-	"fmt_tab_indent": true,
-
-	// the assumed width of the tab character (or number of spaces to indent with)
-	"fmt_tab_width": 8,
-
-	// Whether or not gslint is enabled
-	"gslint_enabled": true,
-
-	// how long to wait after the last keystroke before the gslint_cmd command is run (in milliseconds)
-	"gslint_timeout": 100,
-
-	// whether or not to include snippets in the auto-completion list
-	"autocomplete_snippets": true,
-
-	// whether or not to include Test*, Benchmark* and Example* functions in the auto-completion list
-	"autocomplete_tests": false,
-
-	"margo_cmd": ["MarGo"],
-	// the tcp address on which MarGo listen/should listen
-	// if GoSublime can't connect to `margo_addr` it attempts to start MarGo
-	// with `margo_cmd` passing `margo_addr`
-	"margo_addr": "127.0.0.1:57951",
-
-	"auto_complete_triggers": [ {"selector": "source.go", "characters": "."} ]
+		"GOPATH": "/home/jake/code/gopath",
+		"GOROOT": "/home/jake/code/golang"
+	}
 }
