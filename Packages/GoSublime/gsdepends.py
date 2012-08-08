@@ -11,14 +11,14 @@ MARGO_REPO = 'github.com/DisposaBoy/MarGo'
 dep_check_done = False
 
 class GsDependsOnActivated(sublime_plugin.EventListener):
-	def on_activated(self, view):
+	def on_load(self, view):
 		sublime.set_timeout(gs.sync_settings, 0)
-		if not dep_check_done:
-			sublime.set_timeout(lambda: check_depends(view), 0)
+		if not dep_check_done and gs.is_go_source_view(view):
+			margo.dispatch(check_depends, 'checking dependencies')
 
 class GsUpdateDeps(sublime_plugin.TextCommand):
 	def run(self, edit):
-		run_go_get(self.view)
+		run_go_get()
 
 def split_changes(s):
 	changes = []
@@ -33,29 +33,28 @@ def call_cmd(cmd):
 	_, _, exc = gs.runcmd(cmd)
 	return not exc
 
-hello_sarting = False
-def hello():
-	def cb():
-		global hello_sarting
-		if hello_sarting:
-			return
-		hello_sarting = True
-		print 'starting gocode'
-		call_cmd(['gocode'])
-		margo_cmd = list(gs.setting('margo_cmd', []))
-		if not margo_cmd:
-			err = 'Missing `margo_cmd`'
-			gs.notice("MarGo", err)
-			hello_sarting = False
-			return
+def do_hello():
+	global hello_sarting
+	if hello_sarting:
+		return
+	hello_sarting = True
 
+	tid = gs.begin(DOMAIN, 'Starting Gocode', False)
+	call_cmd(['gocode'])
+	gs.end(tid)
+
+	margo_cmd = list(gs.setting('margo_cmd', []))
+	if margo_cmd:
 		margo_cmd.extend([
 			"-d",
 			"-call", "replace",
 			"-addr", gs.setting('margo_addr', '')
 		])
-		print 'starting margo'
+
+		tid = gs.begin(DOMAIN, 'Starting MarGo', False)
 		out, err, _ = gs.runcmd(margo_cmd)
+		gs.end(tid)
+
 		out = out.strip()
 		err = err.strip()
 		if err:
@@ -63,32 +62,33 @@ def hello():
 		elif out:
 			gs.notice(DOMAIN, 'MarGo started %s' % out)
 		hello_sarting = False
+	else:
+		err = 'Missing `margo_cmd`'
+		gs.notice("MarGo", err)
+		hello_sarting = False
 
-	_, err = margo.post('/', 'hello', {}, True)
+hello_sarting = False
+def hello():
+	_, err = margo.post('/', 'hello', {}, True, False)
 	if err:
-		dispatch(cb, 'Starting MarGo and gocode...')
+		dispatch(do_hello, 'Starting MarGo and gocode...')
 	else:
 		call_cmd(['gocode'])
 
-def run_go_get(view):
+def run_go_get():
 	msg = 'Installing/updating gocode and MarGo...'
 	def f():
 		out, err, _ = gs.runcmd(['go', 'get', '-u', '-v', GOCODE_REPO, MARGO_REPO])
 		margo.bye_ni()
 		call_cmd(['gocode', 'close'])
-		gs.notice(DOMAIN, '%s done\n%s%s' % (msg, out, err))
-	dispatch(f, msg, view)
+		gs.notice(DOMAIN, '%s done' % msg)
+		gs.println(DOMAIN, '%s done\n%s%s' % (msg, out, err))
+		do_hello()
+	dispatch(f, msg)
 
-def check_depends(view):
+def check_depends():
 	global dep_check_done
 	if dep_check_done:
-		return
-
-	if not view or not view.window():
-		sublime.set_timeout(lambda: check_depends(view), 1000)
-		return
-
-	if not gs.is_go_source_view(view):
 		return
 
 	dep_check_done = True
@@ -113,16 +113,19 @@ def check_depends(view):
 	if missing:
 		def cb(i):
 			if i == 0:
-				run_go_get(view)
+				run_go_get()
 		items = [[
 			'GoSublime depends on gocode and MarGo',
 			'Install %s (using `go get`)' % ', '.join(missing),
 			'gocode repo: %s' % GOCODE_REPO,
 			'MarGo repo: %s' % MARGO_REPO,
 		]]
-		view.window().show_quick_panel(items, cb)
-		return
 
+		win = sublime.active_window()
+		if win:
+			win.show_quick_panel(items, cb)
+		gs.println(DOMAIN, '\n'.join(items[0]))
+		return
 	changelog_fn = os.path.join(sublime.packages_path(), 'GoSublime', "CHANGELOG.md")
 	try:
 		with open(changelog_fn) as f:
@@ -142,9 +145,9 @@ def check_depends(view):
 
 			def on_panel_close(i):
 				if i == 1 or i == 2:
-					view = win.open_file(changelog_fn)
+					win.open_file(changelog_fn)
 					if i == 1:
-						run_go_get(view)
+						run_go_get()
 						settings.set('tracking_rev', new_rev)
 						sublime.save_settings(settings_fn)
 
@@ -169,22 +172,14 @@ def check_depends(view):
 				]
 				win.show_quick_panel(items, on_panel_close)
 				return
-	dispatch(hello)
+
+	margo.call(
+		path='/',
+		args='hello',
+		message='hello MarGo'
+	)
 
 
 
-Q = None
-
-def dispatch(f, msg='', view=None, p=0):
-	global Q
-	if not Q:
-		Q = gsq.GsQ(DOMAIN)
-		Q.start()
-
-	def cb(v):
-		if v is None:
-			win = sublime.active_window()
-			if win:
-				v = win.active_view()
-		Q.dispatch(f, msg, v, v is not None, p)
-	sublime.set_timeout(lambda: cb(view), 0)
+def dispatch(f, msg=''):
+	gsq.dispatch(DOMAIN, f, msg)

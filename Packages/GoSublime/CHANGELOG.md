@@ -1,3 +1,13 @@
+## r12.07.31-1
+	* add platform info e.g (linux, amd64) to pkg declarations list (`ctrl+dot`,`ctrl+l`)
+
+## r12.07.28-2
+	* add command palette entry to show the build output
+	    press `ctrl+dot`,`ctrl+dot` and start typing `build output`
+
+## r12.07.28-1
+	* update gocode: nsf fixed a bug that could cause gocode to hang on invalid input
+
 ## r12.07.21-2
 	* fix: handle filename for browse files correctly
 	    update MarGo

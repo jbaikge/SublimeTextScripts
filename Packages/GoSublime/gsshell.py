@@ -1,6 +1,6 @@
 import sublime, sublime_plugin
 import gscommon as gs
-import re, os, httplib
+import re, os, httplib, hashlib
 
 DOMAIN = "GsShell"
 GO_RUN_PAT = re.compile(r'^go\s+(run|play)$', re.IGNORECASE)
@@ -19,15 +19,16 @@ class Prompt(object):
 		self.settings = sublime.load_settings('GoSublime-GsShell.sublime-settings')
 		self.change_history = change_history
 
-	def on_done(self, s):
+	def on_done(self, s, fmt_save=True):
 		fn = self.view.file_name()
 		win = self.view.window()
 		if fn and win:
 			basedir = os.path.dirname(fn)
-			for v in win.views():
-				vfn = v.file_name()
-				if vfn and os.path.dirname(vfn) == basedir and vfn.endswith('.go'):
-					v.run_command('gs_fmt_save')
+			if fmt_save:
+				for v in win.views():
+					vfn = v.file_name()
+					if vfn and os.path.dirname(vfn) == basedir and vfn.endswith('.go'):
+						v.run_command('gs_fmt_save')
 
 		# above we do some saves - thus creating a race so push this back to the end of the queue
 		def cb(s):
@@ -64,21 +65,23 @@ class Prompt(object):
 			if GO_RUN_PAT.match(s):
 				if not file_name:
 					# todo: clean this up after the command runs
-					f, err = gs.temp_file(suffix='.go', prefix=DOMAIN+'-play.', delete=False)
-					if err:
-						self.show_output(err)
-						return
-					else:
-						try:
+					err = ''
+					tdir, _ = gs.temp_dir('play')
+					file_name = hashlib.sha1(gs.view_fn(self.view) or 'a').hexdigest()
+					file_name = os.path.join(tdir, ('%s.go' % file_name))
+					try:
+						with open(file_name, 'w') as f:
 							src = self.view.substr(sublime.Region(0, self.view.size()))
 							if isinstance(src, unicode):
 								src = src.encode('utf-8')
 							f.write(src)
-							f.close()
-						except Exception as ex:
-							self.show_output('Error: %s' % ex)
-							return
-						file_name = f.name
+					except Exception as ex:
+						err = str(ex)
+
+					if err:
+						self.show_output('Error: %s' % err)
+						return
+
 				s = ['go', 'run', file_name]
 
 			self.view.window().run_command("exec", { 'kill': True })
@@ -144,7 +147,7 @@ class GsShellCommand(sublime_plugin.WindowCommand):
 		view = gs.active_valid_go_view(self.window)
 		return bool(view)
 
-	def run(self, prompt="go ", run=""):
+	def run(self, prompt="go ", run="", fmt_save=True):
 		view = gs.active_valid_go_view(self.window)
 		if not view:
 			gs.notice(DOMAIN, "this not a source.go view")
@@ -153,6 +156,6 @@ class GsShellCommand(sublime_plugin.WindowCommand):
 		run = run.strip()
 		p = Prompt(view, run == "")
 		if run:
-			p.on_done(run)
+			p.on_done(run, fmt_save)
 		else:
 			p.panel = self.window.show_input_panel("GsShell", prompt, p.on_done, p.on_change, None)

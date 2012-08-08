@@ -1,5 +1,5 @@
 import sublime
-import subprocess, re, os, threading, tempfile, datetime
+import subprocess, re, os, threading, tempfile, datetime, uuid
 from subprocess import Popen, PIPE
 
 try:
@@ -36,6 +36,7 @@ GLOBAL_SNIPPETS = [
 	GLOBAL_SNIPPET_IMPORT,
 	(u'func\tfunc {...} \u0282', 'func ${1:name}($2)$3 {\n\t$0\n}'),
 	(u'func\tfunc ([receiver]) {...} \u0282', 'func (${1:receiver} ${2:type}) ${3:name}($4)$5 {\n\t$0\n}'),
+	(u'func handler\thttp.HandlerFunc {...} \u0282', 'func ${1:name}(rw http.ResponseWriter, req *http.Request) {\n\t$0\n}'),
 	(u'func main\tfunc main {...} \u0282', 'func main() {\n\t$0\n}\n'),
 	(u'var\tvar (...) \u0282', 'var (\n\t$1\n)'),
 	(u'const\tconst (...) \u0282', 'const (\n\t$1\n)'),
@@ -72,6 +73,7 @@ GOOSES = [
 	'openbsd',
 	'plan9',
 	'windows',
+	'unix',
 ]
 
 GOOSARCHES = []
@@ -89,14 +91,18 @@ IGNORED_SCOPES = frozenset([
 	'comment.block.go'
 ])
 
-def temp_file(suffix='', prefix='', delete=True):
-	tmpdir = os.path.join(tempfile.gettempdir(), NAME)
+def temp_dir(subdir=''):
+	tmpdir = os.path.join(tempfile.gettempdir(), NAME, subdir)
+	err = ''
 	try:
 		os.mkdir(tmpdir)
 	except Exception as ex:
-		pass
+		err = str(ex)
+	return (tmpdir, err)
+
+def temp_file(suffix='', prefix='', delete=True):
 	try:
-		f = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=tmpdir, delete=delete)
+		f = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix, dir=temp_dir(), delete=delete)
 	except Exception as ex:
 		return (None, 'Error: %s' % ex)
 	return (f, '')
@@ -140,10 +146,12 @@ def println(*a):
 		print(str(s).strip())
 	print('--------------------------------')
 
+debug = println
+
 def notice(domain, txt):
 	txt = "%s: %s" % (domain, txt)
 	println(txt)
-	sublime.set_timeout(lambda: sublime.status_message(txt), 0)
+	status_message(txt)
 
 def notice_undo(domain, txt, view, should_undo):
 	def cb():
@@ -186,13 +194,16 @@ def show_output(panel_name, s, print_output=True, syntax_file=''):
 	sublime.set_timeout(lambda: cb(panel_name, s, print_output, syntax_file), 0)
 
 def is_go_source_view(view=None, strict=True):
-	if not view:
+	if view is None:
 		return False
 
-	if strict:
-		return view.score_selector(view.sel()[0].begin(), 'source.go') > 0
+	selector_match = view.score_selector(view.sel()[0].begin(), 'source.go') > 0
+	if selector_match:
+		return True
 
-	# todo: check the directory tree as well
+	if strict:
+		return False
+
 	fn = view.file_name() or ''
 	return fn.lower().endswith('.go')
 
@@ -266,7 +277,7 @@ def sync_settings():
 		_settings['env'] = e
 
 def view_fn(view):
-	if view:
+	if view is not None:
 		if view.file_name():
 			return view.file_name()
 		return 'view://%s' % view.id()
@@ -315,6 +326,101 @@ def do_focus(fn, row, col, win=None, focus_pkg=True):
 def focus(fn, row=0, col=0, win=None, timeout=100, focus_pkg=True):
 	sublime.set_timeout(lambda: do_focus(fn, row, col, win, focus_pkg), timeout)
 
+def sm_cb():
+	global sm_text
+	global sm_set_text
+	global sm_frame
+
+	with sm_lck:
+		ntasks = len(sm_tasks)
+		tm = sm_tm
+		s = sm_text
+		if s:
+			delta = (datetime.datetime.now() - tm)
+			if delta.seconds >= 5:
+				sm_text = ''
+
+	if ntasks > 0:
+		if s:
+			s = u'%s, %s' % (sm_frames[sm_frame], s)
+		else:
+			s = u'%s' % sm_frames[sm_frame]
+
+		if ntasks > 1:
+			s = '%d %s' % (ntasks, s)
+
+		sm_frame = (sm_frame + 1) % len(sm_frames)
+
+	if s != sm_set_text:
+		sm_set_text = s
+		st2_status_message(s)
+
+	sched_sm_cb()
+
+
+def sched_sm_cb():
+	sublime.set_timeout(sm_cb, 250)
+
+def status_message(s):
+	global sm_text
+	global sm_tm
+
+	with sm_lck:
+		sm_text = s
+		sm_tm = datetime.datetime.now()
+
+def begin(domain, message, set_status=True, cancel=None):
+	if message and set_status:
+		status_message('%s: %s' % (domain, message))
+
+	id = uuid.uuid4()
+	dat = {
+		'start': datetime.datetime.now(),
+		'domain': domain,
+		'message': message,
+		'cancel': cancel,
+	}
+
+	with sm_lck:
+		sm_tasks[id] = dat
+
+	return id
+
+def end(task_id):
+	with sm_lck:
+		try:
+			del(sm_tasks[task_id])
+		except:
+			pass
+
+def task(task_id, default=None):
+	with sm_lck:
+		return sm_tasks.get(task_id, default)
+
+def clear_tasks():
+	with sm_lck:
+		sm_tasks = {}
+
+try:
+	st2_status_message
+except:
+	sm_lck = threading.Lock()
+	sm_tasks = {}
+	sm_frame = 0
+	sm_frames = (
+		u'\u25D2',
+		u'\u25D1',
+		u'\u25D3',
+		u'\u25D0'
+	)
+	sm_tm = datetime.datetime.now()
+	sm_text = ''
+	sm_set_text = ''
+
+	st2_status_message = sublime.status_message
+	sublime.status_message = status_message
+
+	sched_sm_cb()
 
 # init
 settings_obj().clear_on_change("GoSublime.settings")

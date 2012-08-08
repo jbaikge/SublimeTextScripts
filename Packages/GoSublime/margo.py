@@ -1,6 +1,8 @@
 import subprocess, httplib, urllib, json, traceback, os
 import sublime
-import gscommon as gs, gsdepends
+import gscommon as gs, gsdepends, gsq
+
+DOMAIN = 'MarGo'
 
 class Conn(object):
 	def __init__(self):
@@ -29,21 +31,32 @@ conn = Conn()
 def isinst(v, base):
 	return isinstance(v, type(base))
 
-def post(path, a, default, fail_early=False):
+def post(path, a, default, fail_early=False, can_block=False):
 	resp = None
+
 	try:
 		params = urllib.urlencode({ 'data': json.dumps(a) })
 		headers = {
 			"Content-type": "application/x-www-form-urlencoded",
 			"Accept": "application/json; charset=utf-8"
 		}
+	except Exception as ex:
+		return (default, ('MarGo: %s' % ex))
+
+	try:
 		resp = conn.post(path, params, headers)
 	except Exception as ex:
-		err = 'MarGo: %s' % ex
-		# gsdepeds.hello calls us...
-		if not fail_early:
-			gsdepends.dispatch(gsdepends.hello)
-		return (default, err)
+		if can_block:
+			gsdepends.do_hello()
+			try:
+				resp = conn.post(path, params, headers)
+			except Exception as ex:
+				return (default, ('MarGo: %s' % ex))
+		else:
+			# gsdepeds.hello calls us...
+			if not fail_early:
+				gsdepends.dispatch(gsdepends.hello)
+			return (default, ('MarGo: %s' % ex))
 
 	if not isinst(resp, {}):
 		resp = {}
@@ -61,16 +74,6 @@ def declarations(filename, src, pkg_dir=''):
 		'src': src,
 		'env': gs.env(),
 		'pkg_dir': pkg_dir,
-	}, {})
-
-def pkgdirs():
-	return post('/pkgdirs', {
-		'env': gs.env(),
-	}, {})
-
-def pkgfiles(dirname):
-	return post('/pkgfiles', {
-		'path': dirname,
 	}, {})
 
 def fmt(filename, src):
@@ -108,19 +111,32 @@ def imports(filename, src, toggle):
 		'tab_width': gs.setting('fmt_tab_width'),
 	}, {})
 
-def import_paths(filename, src):
-	return post('/import_paths', {
-		'fn': filename or '',
-		'src': src,
-		'env': gs.env(),
-	}, {})
+def call(path='/', args={}, default={}, cb=None, message=''):
+	try:
+		if args is None:
+			a = ''
+		elif isinst(args, {}):
+			a = {
+				'env': gs.env(),
+				'tab_indent': gs.setting('fmt_tab_indent'),
+				'tab_width': gs.setting('fmt_tab_width'),
+			}
+			for k, v in args.iteritems():
+				if v is None:
+					v = ''
+				a[k] = v
+		else:
+			a = args
+	except:
+		a = args
 
-def doc(filename, src, offset):
-	return post('/doc', {
-		'fn': filename or '',
-		'src': src,
-		'offset': offset,
-		'env': gs.env(),
-		'tab_indent': gs.setting('fmt_tab_indent'),
-		'tab_width': gs.setting('fmt_tab_width'),
-	}, [])
+	def f():
+		res, err = post(path, a, default, False, True)
+		if cb:
+			sublime.set_timeout(lambda: cb(res, err), 0)
+
+	dispatch(f, 'call %s: %s' % (path, message))
+
+def dispatch(f, msg):
+	gsq.dispatch(DOMAIN, f, msg)
+

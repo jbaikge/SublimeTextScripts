@@ -1,6 +1,6 @@
 import sublime, sublime_plugin
 import gscommon as gs, margo
-import os
+import os, datetime
 
 class GsCommentForwardCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -59,3 +59,45 @@ class GsNewGoFileCommand(sublime_plugin.WindowCommand):
 			view.sel().add(view.find(pkg_name, 0, sublime.LITERAL))
 		finally:
 			view.end_edit(edit)
+
+class GsShowTasksCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		ents = []
+		now = datetime.datetime.now()
+		with gs.sm_lck:
+			tasks = gs.sm_tasks.values()
+
+		m = {}
+		try:
+			tasks = []
+
+			for tid, t in gs.sm_tasks.items():
+				tasks.append((tid, t))
+			tasks.sort(key=lambda a: a[1]['start'], reverse=True)
+
+			ents.insert(0, ['', '%d active task(s)' % len(tasks)])
+			for a in tasks:
+				tid, t = a
+				delta = (now - t['start'])
+				cancel_text = ''
+				if t['cancel']:
+					cancel_text = ' (cancel task)'
+					m[len(ents)] = tid
+
+				ents.append([
+					'%s%s' % (t['domain'], cancel_text),
+					t['message'],
+					'started: %s' % t['start'],
+					'elapsed: %s' % delta
+				])
+		except:
+			ents = [['', 'Failed to gather active tasks']]
+
+		def cb(i):
+			t = gs.task(m.get(i, ''))
+			if t and t['cancel']:
+				s = 'are you sure you want to end task: %s: %s' % (t['domain'], t['message'])
+				if sublime.ok_cancel_dialog(s):
+					t['cancel']()
+
+		self.window.show_quick_panel(ents, cb)
