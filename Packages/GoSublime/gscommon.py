@@ -95,7 +95,7 @@ def temp_dir(subdir=''):
 	tmpdir = os.path.join(tempfile.gettempdir(), NAME, subdir)
 	err = ''
 	try:
-		os.mkdir(tmpdir)
+		os.makedirs(tmpdir)
 	except Exception as ex:
 		err = str(ex)
 	return (tmpdir, err)
@@ -400,6 +400,40 @@ def task(task_id, default=None):
 def clear_tasks():
 	with sm_lck:
 		sm_tasks = {}
+
+def show_quick_panel(items, cb=None):
+	def f():
+		win = sublime.active_window()
+		if win:
+			win.show_quick_panel(items, (lambda i: cb(i, win)) if cb else (lambda i: None))
+	sublime.set_timeout(f, 0)
+
+def go_env_goroot():
+	out, _, _ = runcmd(['go env GOROOT'], shell=True)
+	return out.strip()
+
+def list_dir_tree(dirname, extensions):
+	lst = []
+
+	try:
+		for fn in os.listdir(dirname):
+			if fn[0] in ('.', '_'):
+				continue
+
+			fn = os.path.join(dirname, fn)
+			if os.path.isdir(fn):
+				lst.extend(list_dir_tree(fn, extensions))
+			elif extensions:
+				_, ext = os.path.splitext(fn)
+				if ext.lstrip('.') in extensions:
+					lst.append(fn)
+			else:
+				lst.append(fn)
+	except Exception:
+		pass
+
+	return lst
+
 
 try:
 	st2_status_message

@@ -1,3 +1,18 @@
+## r12.08.10-3
+	* `ctrl+dot`,`ctrl+a` is now accessible globally
+
+## r12.08.10-2
+	* `ctrl+dot`,`ctrl+o` now presents a file list instead of opening a file
+
+## r12.08.10-1
+	* `ctrl+dot`,`ctrl+m` now list all relevant files (.go, .c, etc.)
+	    as well all files in the directory tree recursively (sub-packages)
+	    it also now works globally
+
+## r12.08.08-1
+	* fix a bug which could cause MarGo to take a long time to respond (when accidentally parsing binary files)
+	update MarGo
+
 ## r12.07.31-1
 	* add platform info e.g (linux, amd64) to pkg declarations list (`ctrl+dot`,`ctrl+l`)
 
