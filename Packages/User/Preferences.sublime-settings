@@ -4,10 +4,12 @@
 	"color_scheme": "Packages/User/Monokai Soda.tmTheme",
 	"draw_white_space": "all",
 	"ensure_newline_at_eof_on_save": true,
-	"font_size": 8,
-	"ignored_packages":
+	"font_face": "ProggyCleanTT",
+	"font_size": 12,
+	"indent_guide_options":
 	[
-		"Vintage"
+		"draw_normal",
+		"draw_active"
 	],
 	"paste.key": "922df615b81dd5cc08a8",
 	"rulers":
