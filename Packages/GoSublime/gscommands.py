@@ -1,6 +1,28 @@
 import sublime, sublime_plugin
-import gscommon as gs, margo
+import gscommon as gs, margo, gsq
 import os, datetime
+
+def do_post_save(view):
+	if not gs.is_pkg_view(view):
+		return
+
+	domain = 'GoSublime-On-Save'
+	for c in gs.setting('on_save', []):
+		cmd = c.get('cmd', '')
+		args = c.get('args', {})
+		msg = 'running on_save command %s' % cmd
+		tid = gs.begin(domain, msg, set_status=False)
+		gs.println(msg)
+		try:
+			view.run_command(cmd, args)
+		except Exception as ex:
+			gs.notice(domain, 'Error %s' % ex)
+		finally:
+			gs.end(tid)
+
+class EV(sublime_plugin.EventListener):
+	def on_post_save(self, view):
+		sublime.set_timeout(lambda: do_post_save(view), 0)
 
 class GsCommentForwardCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -41,13 +63,16 @@ class GsNewGoFileCommand(sublime_plugin.WindowCommand):
 		default_file_name = 'untitled.go'
 		pkg_name = 'main'
 		view = gs.active_valid_go_view()
-		basedir = gs.basedir_or_cwd(view and view.file_name())
-		for fn in os.listdir(basedir):
-			if fn.endswith('.go'):
-				name, _ = margo.package(os.path.join(basedir, fn), '')
-				if name and name.get('Name'):
-					pkg_name = name.get('Name')
-					break
+		try:
+			basedir = gs.basedir_or_cwd(view and view.file_name())
+			for fn in os.listdir(basedir):
+				if fn.endswith('.go'):
+					name, _ = margo.package(os.path.join(basedir, fn), '')
+					if name and name.get('Name'):
+						pkg_name = name.get('Name')
+						break
+		except Exception:
+			pass
 
 		view = self.window.new_file()
 		view.set_name(default_file_name)

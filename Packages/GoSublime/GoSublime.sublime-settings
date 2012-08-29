@@ -25,6 +25,9 @@
 	// Whether or not gslint is enabled
 	"gslint_enabled": true,
 
+	// Whether or not comp lint is enabled (this might conflict with gslint)
+	"comp_lint_enabled": false,
+
 	// how long to wait after the last keystroke before the gslint_cmd command is run (in milliseconds)
 	"gslint_timeout": 100,
 
@@ -39,6 +42,11 @@
 	// if GoSublime can't connect to `margo_addr` it attempts to start MarGo
 	// with `margo_cmd` passing `margo_addr`
 	"margo_addr": "127.0.0.1:57951",
+
+	// commands to run on (post) save - list of objects of the form {"cmd": "...", "args": {...}}
+	// Any TextCommand may be run. Supported GS commands include:
+	//     gs_comp_lint - compile the pkg and report any errors
+	"on_save": [],
 
 	"auto_complete_triggers": [ {"selector": "source.go", "characters": "."} ]
 }

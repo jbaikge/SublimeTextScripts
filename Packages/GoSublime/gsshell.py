@@ -1,6 +1,6 @@
 import sublime, sublime_plugin
 import gscommon as gs
-import re, os, httplib, hashlib
+import re, os, httplib, hashlib, threading, Queue, traceback, subprocess, time, signal
 
 DOMAIN = "GsShell"
 GO_RUN_PAT = re.compile(r'^go\s+(run|play)$', re.IGNORECASE)
@@ -167,3 +167,220 @@ class GsShellCommand(sublime_plugin.WindowCommand):
 			p.on_done(run, fmt_save)
 		else:
 			p.panel = self.window.show_input_panel("GsShell", prompt, p.on_done, p.on_change, None)
+
+class Command(threading.Thread):
+	def __init__(self, cmd=[], shell=False, env={}, cwd=''):
+		super(Command, self).__init__()
+		self.lck = threading.Lock()
+		self.daemon = True
+		self.cancelled = False
+		self.q = Queue.Queue()
+		self.p = None
+		self.x = None
+		self.rcode = None
+		self.env = env
+		self.started = 0
+		self.output_started = 0
+		self.ended = 0
+
+		cmd_is_list = isinstance(cmd, type([]))
+		if cmd_is_list:
+			self.message = ' '.join(cmd)
+		else:
+			self.message = str(cmd)
+
+		self.shell = shell
+		if shell and cmd_is_list:
+			self.cmd = ' '.join(cmd)
+		else:
+			self.cmd = str(cmd)
+
+		if cwd:
+			self.cwd = cwd
+		else:
+			try:
+				self.cwd = gs.basedir_or_cwd(sublime.active_window().active_view().file_name())
+			except Exception:
+				self.cwd = None
+
+	def outq(self):
+		return self.q
+
+	def process(self):
+		return self.p
+
+	def exception(self):
+		return self.x
+
+	def return_code(self):
+		return self.rcode
+
+	def on_output(self, c, line):
+		c.outq().put(line)
+
+	def consume_outq(self):
+		l = []
+		try:
+			while True:
+				l.append(self.q.get_nowait())
+		except Queue.Empty:
+			pass
+		return l
+
+	def on_done(self, c):
+		pass
+
+	def poll(self):
+		with self.lck:
+			if self.p:
+				return self.p.poll()
+		return False
+
+	def cancel(self):
+		if self.poll() is None:
+			try:
+				os.killpg(self.p.pid, signal.SIGTERM)
+			except Exception:
+				with self.lck:
+					self.p.terminate()
+
+			time.sleep(0.100)
+			if not self.completed():
+				time.sleep(0.500)
+				if not self.completed():
+					with self.lck:
+						try:
+							os.killpg(self.p.pid, signal.SIGKILL)
+						except Exception:
+							try:
+								self.p.kill()
+							except Exception:
+								pass
+					self.close_stdout()
+
+		discarded = 0
+		try:
+			while True:
+				self.q.get_nowait()
+				discarded += 1
+		except Queue.Empty:
+			pass
+
+		return discarded
+
+	def close_stdout(self):
+		try:
+			with self.lck:
+				if self.p:
+					self.p.stdout.close()
+		except Exception:
+			pass
+
+	def completed(self):
+		return self.return_code() is not None
+
+	def run(self):
+		self.started = time.time()
+		tid = gs.begin(DOMAIN, self.message, set_status=False, cancel=self.cancel)
+		try:
+			try:
+				self.p = gs.popen(self.cmd, shell=self.shell, stderr=subprocess.STDOUT,
+					environ=self.env, cwd=self.cwd)
+
+				while True:
+					line = self.p.stdout.readline()
+
+					if not line:
+						self.close_stdout()
+						break
+
+					if not self.output_started:
+						self.output_started = time.time()
+
+					self.on_output(self, line.rstrip('\r\n'))
+			except Exception as ex:
+				self.x = ex
+			finally:
+				if self.p:
+					with self.lck:
+						self.rcode = self.p.wait()
+				else:
+					self.rcode = False
+		finally:
+			gs.end(tid)
+			self.ended = time.time()
+			self.on_done(self)
+
+class ViewCommand(Command):
+	def __init__(self, cmd=[], shell=False, env={}, cwd='', view=None):
+		self.view = view
+		super(ViewCommand, self).__init__(cmd=cmd, shell=shell, env=env, cwd=cwd)
+
+	def poll_output(self):
+		l = []
+		try:
+			for i in range(500):
+				l.append(self.q.get_nowait())
+		except Queue.Empty:
+			pass
+
+		if l:
+			self.do_insert(l)
+
+		if not self.completed() or self.q.qsize() > 0:
+			sublime.set_timeout(self.poll_output, 100)
+
+	def do_insert(self, lines):
+		if self.view is not None:
+			edit = self.view.begin_edit()
+			try:
+				self.write_lines(self.view, edit, lines)
+			finally:
+				self.view.end_edit(edit)
+
+	def write_lines(self, view, edit, lines):
+		for ln in lines:
+			view.insert(edit, view.size(), u'%s\n' % ln.decode('utf-8'))
+		view.show(view.line(view.size() - 1).begin())
+
+	def on_done(self, c):
+		ex = self.exception()
+		if ex:
+			self.on_output(c, 'Error: ' % ex)
+
+		t = (max(0, c.ended - c.started), max(0, c.output_started - c.started))
+		self.on_output(c, '[done: elapsed: %0.3fs, startup: %0.3fs]\n' % t)
+
+	def cancel(self):
+		discarded = super(ViewCommand, self).cancel()
+		t = ((time.time() - self.started), discarded)
+		self.on_output(self, ('\n[cancelled: elapsed: %0.3fs, discarded %d line(s)]\n' % t))
+
+	def run(self):
+		sublime.set_timeout(self.poll_output, 0)
+		super(ViewCommand, self).run()
+
+class CommandKLineCountPrinter(object):
+	def __init__(self):
+		self.lc = 0
+
+	def printer(self, c, line):
+		self.lc += 1
+		if self.lc > 100:
+			if self.lc % 1000 == 0:
+				print self.lc
+		else:
+			print self.lc, line
+
+def test_command(cmd=[], shell=False):
+	def on_done(c):
+		print '\ndone: elapsed: %0.3fs, startup: %0.3fs\n' % (max(0, c.ended - c.started), max(0, c.output_started - c.started))
+
+	c = Command(cmd=(cmd or ['find', '/']), shell=shell)
+	c.on_done = on_done
+	c.on_output = CommandKLineCountPrinter().printer
+	return c
+
+def test_view_command(cmd=[], shell=False, view=None):
+	c = ViewCommand(cmd=(cmd or ['find', '/']), shell=shell, view=view)
+	return c

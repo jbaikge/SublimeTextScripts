@@ -18,11 +18,13 @@ _settings = {
 	"fmt_tab_indent": True,
 	"fmt_tab_width": 8,
 	"gslint_enabled": False,
+	"comp_lint_enabled": False,
 	"gslint_timeout": 0,
 	"autocomplete_snippets": False,
 	"autocomplete_tests": False,
 	"margo_cmd": [],
-	"margo_addr": ""
+	"margo_addr": "",
+	"on_save": [],
 }
 
 NAME = 'GoSublime'
@@ -112,16 +114,26 @@ def basedir_or_cwd(fn):
 		return os.path.dirname(fn)
 	return os.getcwd()
 
-def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False):
+def popen(args, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None):
+	ev = os.environ.copy()
+	ev.update(env())
+	ev.update(environ)
+
+	try:
+		setsid = os.setsid
+	except Exception:
+		setsid = None
+
+	return Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE, startupinfo=STARTUP_INFO,
+		shell=shell, env=ev, cwd=cwd, preexec_fn=setsid)
+
+def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None):
 	out = ""
 	err = ""
 	exc = None
 
-	old_env = os.environ.copy()
-	os.environ.update(env())
 	try:
-		p = Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE,
-			startupinfo=STARTUP_INFO, shell=shell)
+		p = popen(args, stdout=stdout, stderr=stderr, shell=shell, environ=environ, cwd=cwd)
 		if isinstance(input, unicode):
 			input = input.encode('utf-8')
 		out, err = p.communicate(input=input)
@@ -130,7 +142,7 @@ def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False):
 	except (Exception) as e:
 		err = u'Error while running %s: %s' % (args[0], e)
 		exc = e
-	os.environ.update(old_env)
+
 	return (out, err, exc)
 
 def settings_obj():
@@ -193,6 +205,10 @@ def show_output(panel_name, s, print_output=True, syntax_file=''):
 			win.run_command("show_panel", {"panel": "output.%s" % panel_name})
 	sublime.set_timeout(lambda: cb(panel_name, s, print_output, syntax_file), 0)
 
+def is_pkg_view(view=None):
+	# todo implement this fully
+	return is_go_source_view(view, False)
+
 def is_go_source_view(view=None, strict=True):
 	if view is None:
 		return False
@@ -219,17 +235,31 @@ def active_valid_go_view(win=None, strict=True):
 def rowcol(view):
 	return view.rowcol(view.sel()[0].begin())
 
+def getenv(name, default=''):
+	return env().get(name, default)
+
 def env():
 	e = os.environ.copy()
 	e.update(setting('env', {}))
 	roots = e.get('GOPATH', '').split(os.pathsep)
 	roots.append(e.get('GOROOT', ''))
+
 	add_path = e.get('PATH', '').split(os.pathsep)
 	for s in roots:
 		if s:
 			s = os.path.join(s, 'bin')
 			if s not in add_path:
 				add_path.append(s)
+
+	if os.name == "nt":
+		l = ['C:\\Go\\bin']
+	else:
+		l = ['/usr/bin', '/usr/local/go/bin']
+
+	for s in l:
+		if s not in add_path:
+			add_path.append(s)
+
 	e['PATH'] = os.pathsep.join(add_path)
 	return e
 
@@ -412,23 +442,28 @@ def go_env_goroot():
 	out, _, _ = runcmd(['go env GOROOT'], shell=True)
 	return out.strip()
 
-def list_dir_tree(dirname, extensions):
+def list_dir_tree(dirname, filter, exclude_prefix=('.', '_')):
 	lst = []
 
 	try:
 		for fn in os.listdir(dirname):
-			if fn[0] in ('.', '_'):
+			if fn[0] in exclude_prefix:
 				continue
 
+			basename = fn.lower()
 			fn = os.path.join(dirname, fn)
+
 			if os.path.isdir(fn):
-				lst.extend(list_dir_tree(fn, extensions))
-			elif extensions:
-				_, ext = os.path.splitext(fn)
-				if ext.lstrip('.') in extensions:
-					lst.append(fn)
+				lst.extend(list_dir_tree(fn, filter))
 			else:
-				lst.append(fn)
+				if filter:
+					pathname = fn.lower()
+					_, ext = os.path.splitext(basename)
+					ext = ext.lstrip('.')
+					if filter(pathname, basename, ext):
+						lst.append(fn)
+				else:
+					lst.append(fn)
 	except Exception:
 		pass
 
