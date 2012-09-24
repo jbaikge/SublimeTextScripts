@@ -1,6 +1,7 @@
 import sublime, sublime_plugin
 import os, os.path
 import re
+import getTeXRoot
 
 def match(rex, str):
     m = rex.match(str)
@@ -8,6 +9,36 @@ def match(rex, str):
         return m.group(0)
     else:
         return None
+
+# recursively search all linked tex files to find all
+# included bibliography tags in the document and extract
+# the absolute filepaths of the bib files
+def find_bib_files(rootdir, src, bibfiles):
+    if src[-4:] != ".tex":
+        src = src + ".tex"
+
+    file_path = os.path.normpath(os.path.join(rootdir,src))
+    print "Searching file: " + file_path
+    dir_name = os.path.dirname(file_path)
+
+    # read src file and extract all bibliography tags
+    src_file = open(file_path, "r")
+    src_content = re.sub("%.*","",src_file.read())
+    bibtags =  re.findall(r'\\bibliography\{[^\}]+\}', src_content)
+
+    # extract absolute filepath for each bib file
+    for tag in bibtags:
+        bfiles = re.search(r'\{([^\}]+)', tag).group(1).split(',')
+        for bf in bfiles:
+            if bf[-4:] != '.bib':
+                bf = bf + '.bib'
+            bf = os.path.normpath(os.path.join(dir_name,bf))
+            bibfiles.append(bf)
+
+    # search through input tex files recursively
+    for f in re.findall(r'\\(?:input|include)\{[^\}]+\}',src_content):
+        input_f = re.search(r'\{([^\}]+)', f).group(1)
+        find_bib_files(dir_name, input_f, bibfiles)
 
 # Based on html_completions.py
 # see also latex_ref_completions.py
@@ -54,57 +85,73 @@ class LatexCiteCompletions(sublime_plugin.EventListener):
         # NOTE2: restrict what to match for fancy cite
         rex = re.compile("([^_]*_)?([a-zX]*?)etic")
         expr = match(rex, line)
-        print expr
-        if not expr:
-            return []
+        #print expr
+        
+        # See first if we have a cite_ trigger
+        if expr:
+            # Return the completions
+            prefix, fancy_cite = rex.match(expr).groups()
+            preformatted = False
+            post_brace = "}"
+            if prefix:
+                prefix = prefix[::-1] # reverse
+                prefix = prefix[1:] # chop off #
+            if fancy_cite:
+                fancy_cite = fancy_cite[::-1]
+                # fancy_cite = fancy_cite[1:] # no need to chop off?
+                if fancy_cite[-1] == "X":
+                    fancy_cite = fancy_cite[:-1] + "*"
+            print prefix, fancy_cite
 
-        # Return the completions
-        prefix, fancy_cite = rex.match(expr).groups()
-        if prefix:
-            prefix = prefix[::-1] # reverse
-            prefix = prefix[1:] # chop off #
-        if fancy_cite:
-            fancy_cite = fancy_cite[::-1]
-            # fancy_cite = fancy_cite[1:] # no need to chop off?
-            if fancy_cite[-1] == "X":
-                fancy_cite = fancy_cite[:-1] + "*"
-        print prefix, fancy_cite
+        # Otherwise, see if we have a preformatted \cite{}
+        else:
+            rex = re.compile(r"([^{}]*)\{?([a-zX*]*?)etic\\")
+            expr = match(rex, line)
+
+            if not expr:
+                return []
+
+            preformatted = True
+            post_brace = ""
+            prefix, fancy_cite = rex.match(expr).groups()
+            if prefix:
+                prefix = prefix[::-1]
+            else:
+                prefix = ""
+            if fancy_cite:
+                fancy_cite = fancy_cite[::-1]
+                if fancy_cite[-1] == "X":
+                    fancy_cite = fancy_cite[:-1] + "*"
+            else:
+                fancy_cite = ""
+            print prefix, fancy_cite
 
         # Reverse back expr
         expr = expr[::-1]
+
+        if not preformatted:
+            # Replace cite expression with "C" to save space in drop-down menu
+            expr_region = sublime.Region(l-len(expr),l)
+            #print expr, view.substr(expr_region)
+            ed = view.begin_edit()
+            expr = "\cite" + fancy_cite + "{" + prefix
+            view.replace(ed, expr_region, expr)
+            view.end_edit(ed)
         
-        # Replace cite expression with "C" to save space in drop-down menu
-        expr_region = sublime.Region(l-len(expr),l)
-        #print expr, view.substr(expr_region)
-        ed = view.begin_edit()
-        view.replace(ed, expr_region, "C")
-        view.end_edit(ed)
-        expr = "C"
 
         completions = ["TEST"]
 
         #### GET COMPLETIONS HERE #####
+        root = getTeXRoot.get_tex_root(view)
 
-        # Allow for multiple bib files; remove whitespace in names
-        # Note improved regex: matching fails with , or }, so no need to be
-        # explicit and add it after []+
-        bib_regions = view.find_all(r'\\bibliography\{[^\}]+')
-        # The \bibliography command may be commented out: find this out
-        # We check every match until we find the first command that is not
-        # commented out
-        bib_found = False
-        for bib_region in bib_regions:
-            bib_line = view.line(bib_region)
-            bib_command = view.substr(bib_line).strip()
-            if bib_command[0] == '\\':
-                print bib_command
-                bib_found = True
-                break
-        if not bib_found:
-            sublime.error_message("Cannot find \\bibliography{} command!")
-            return []
+        print "TEX root: " + root
+        bib_files = []
+        find_bib_files(os.path.dirname(root),root,bib_files)
+        # remove duplicate bib files
+        bib_files = list(set(bib_files))
+        print "Bib files found: ",
+        print bib_files
 
-        bib_files = re.search(r'\{([^\}]+)', bib_command).group(1).split(',')
         if not bib_files:
             print "Error!"
             return []
@@ -112,14 +159,7 @@ class LatexCiteCompletions(sublime_plugin.EventListener):
         
         print "Files:"
         print bib_files
-        # bibp = re.compile(r'\{(.+)') # we dropped last , or } so don't look for it
-        # bibmatch = bibp.search(bibcmd)
-        # if not bibmatch:
-        #     print "Cannot parse bibliography command: " + bibcmd
-        #     return
-        # bibfname = bibmatch.group(1)
-        # print bibfname
-        
+         
         completions = []
         kp = re.compile(r'@[^\{]+\{(.+),')
         # new and improved regex
@@ -160,22 +200,23 @@ class LatexCiteCompletions(sublime_plugin.EventListener):
 
         #### END COMPLETIONS HERE ####
 
-        print completions
+        print "Found %d completions" % (len(completions),)
 
         if prefix:
             completions = [comp for comp in completions if prefix.lower() in "%s %s" % (comp[0].lower(),comp[1].lower())]
 
         # popup is 40chars wide...
-        t_end = 40 - len(expr)
-        r = [(expr + " "+title[:t_end], "\\cite" + fancy_cite + "{" + keyword + "}") 
+        t_end = 80 - len(expr)
+        r = [(prefix + " "+title[:t_end], keyword + post_brace) 
                         for (keyword, title) in completions]
-        print r
 
-        def on_done(i):
-            print "latex_cite_completion called with index %d" % (i,)
-            print "selected" + r[i][1]
+        print "%d bib entries matching %s" % (len(r), prefix)
 
-        print view.window()
+        # def on_done(i):
+        #     print "latex_cite_completion called with index %d" % (i,)
+        #     print "selected" + r[i][1]
+
+        # print view.window()
 
         return r
 
@@ -205,63 +246,66 @@ class LatexCiteCommand(sublime_plugin.TextCommand):
         line = line[::-1]
         #print line
 
-        # Check the first location looks like a ref, but backward
+        # Check the first location looks like a cite_, but backward
         # NOTE: use lazy match for the fancy cite part!!!
         # NOTE2: restrict what to match for fancy cite
         rex = re.compile("([^_]*_)?([a-zX]*?)etic")
         expr = match(rex, line)
-        print expr
-        if not expr:
-            return []
 
-        # Return the completions
-        prefix, fancy_cite = rex.match(expr).groups()
-        if prefix:
-            prefix = prefix[::-1] # reverse
-            prefix = prefix[1:] # chop off #
-        if fancy_cite:
-            fancy_cite = fancy_cite[::-1]
-            # fancy_cite = fancy_cite[1:] # no need to chop off?
-            if fancy_cite[-1] == "X":
-                fancy_cite = fancy_cite[:-1] + "*"
-        print prefix, fancy_cite
+        # See first if we have a cite_ trigger
+        if expr:
+            # Return the completions
+            prefix, fancy_cite = rex.match(expr).groups()
+            preformatted = False
+            post_brace = "}"
+            if prefix:
+                prefix = prefix[::-1] # reverse
+                prefix = prefix[1:] # chop off #
+            if fancy_cite:
+                fancy_cite = fancy_cite[::-1]
+                # fancy_cite = fancy_cite[1:] # no need to chop off?
+                if fancy_cite[-1] == "X":
+                    fancy_cite = fancy_cite[:-1] + "*"
+            print prefix, fancy_cite
+
+        # Otherwise, see if we have a preformatted \cite{}
+        else:
+            rex = re.compile(r"([^{}]*)\{?([a-zX*]*?)etic\\")
+            expr = match(rex, line)
+
+            if not expr:
+                return []
+
+            preformatted = True
+            post_brace = ""
+            prefix, fancy_cite = rex.match(expr).groups()
+            if prefix:
+                prefix = prefix[::-1]
+            else:
+                prefix = ""
+            if fancy_cite:
+                fancy_cite = fancy_cite[::-1]
+                if fancy_cite[-1] == "X":
+                    fancy_cite = fancy_cite[:-1] + "*"
+            else:
+                fancy_cite = ""
+            print prefix, fancy_cite
 
         # Reverse back expr
         expr = expr[::-1]
-        
-        # We no longer need this stuff:
-        # # Replace cite expression with "C" to save space in drop-down menu
-        # expr_region = sublime.Region(point-len(expr),point)
-        # #print expr, view.substr(expr_region)
-        # ed = view.begin_edit()
-        # view.replace(ed, expr_region, "C")
-        # view.end_edit(ed)
-        # expr = "C"
-
-        completions = ["TEST"]
 
         #### GET COMPLETIONS HERE #####
 
-        # Allow for multiple bib files; remove whitespace in names
-        # Note improved regex: matching fails with , or }, so no need to be
-        # explicit and add it after []+
-        bib_regions = view.find_all(r'\\bibliography\{[^\}]+')
-        # The \bibliography command may be commented out: find this out
-        # We check every match until we find the first command that is not
-        # commented out
-        bib_found = False
-        for bib_region in bib_regions:
-            bib_line = view.line(bib_region)
-            bib_command = view.substr(bib_line).strip()
-            if bib_command[0] == '\\':
-                print bib_command
-                bib_found = True
-                break
-        if not bib_found:
-            sublime.error_message("Cannot find \\bibliography{} command!")
-            return []
+        root = getTeXRoot.get_tex_root(view)
 
-        bib_files = re.search(r'\{([^\}]+)', bib_command).group(1).split(',')
+        print "TEX root: " + root
+        bib_files = []
+        find_bib_files(os.path.dirname(root),root,bib_files)
+        # remove duplicate bib files
+        bib_files = list(set(bib_files))
+        print "Bib files found: ",
+        print bib_files
+
         if not bib_files:
             print "Error!"
             return []
@@ -269,13 +313,6 @@ class LatexCiteCommand(sublime_plugin.TextCommand):
         
         print "Files:"
         print bib_files
-        # bibp = re.compile(r'\{(.+)') # we dropped last , or } so don't look for it
-        # bibmatch = bibp.search(bibcmd)
-        # if not bibmatch:
-        #     print "Cannot parse bibliography command: " + bibcmd
-        #     return
-        # bibfname = bibmatch.group(1)
-        # print bibfname
         
         completions = []
         kp = re.compile(r'@[^\{]+\{(.+),')
@@ -311,20 +348,23 @@ class LatexCiteCommand(sublime_plugin.TextCommand):
             titles = [tp.search(line).group(1).decode('ascii','ignore') for line in bib if tp.search(line)]
             authors = [ap.search(line).group(1).decode('ascii','ignore') for line in bib if ap.search(line)]
 
-            print zip(keywords,titles,authors)
+#            print zip(keywords,titles,authors)
 
             if len(keywords) != len(titles):
                 print "Bibliography " + bibfname + " is broken!"
                 return
+
             # if len(keywords) != len(authors):
             #     print "Bibliography " + bibfname + " is broken (authors)!"
             #     return
+
+            print "Found %d total bib entries" % (len(keywords),)
+
             # Filter out }'s and ,'s at the end. Ugly!
             nobraces = re.compile(r'\s*,*\}*(.+)')
             titles = [nobraces.search(t[::-1]).group(1)[::-1] for t in titles]
             authors = [nobraces.search(a[::-1]).group(1)[::-1] for a in authors]
             completions += zip(keywords, titles, authors)
-
 
         #### END COMPLETIONS HERE ####
 
@@ -341,7 +381,8 @@ class LatexCiteCommand(sublime_plugin.TextCommand):
             if i<0:
                 return
 
-            cite = "\\cite" + fancy_cite + "{" + completions[i][0] + "}"
+            last_brace = "}" if not preformatted else ""
+            cite = "\\cite" + fancy_cite + "{" + completions[i][0] + last_brace
 
             print "selected %s:%s by %s" % completions[i] 
             # Replace cite expression with citation
