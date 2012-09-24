@@ -1,6 +1,6 @@
 import sublime, sublime_plugin
 import json, os, re
-import gscommon as gs
+import gscommon as gs, gsshell, gsbundle
 from os.path import basename
 
 AC_OPTS = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
@@ -9,6 +9,57 @@ last_gopath = ''
 END_SELECTOR_PAT = re.compile(r'.*?((?:[\w.]+\.)?(\w+))$')
 START_SELECTOR_PAT = re.compile(r'^([\w.]+)')
 DOMAIN = 'GsComplete'
+SNIPPET_VAR_PAT = re.compile(r'\$\{([a-zA-Z]\w*)\}')
+
+def snippet_match(ctx, m):
+	try:
+		for k,p in m.get('match', {}).iteritems():
+			q = ctx.get(k, '')
+			if p and gs.is_a_string(p):
+				if not re.search(p, str(q)):
+					return False
+			elif p != q:
+				return False
+	except:
+		gs.notice(DOMAIN, gs.traceback())
+	return True
+
+def expand_snippet_vars(vars, text, title, value):
+	sub = lambda m: vars.get(m.group(1), '')
+	return (
+		SNIPPET_VAR_PAT.sub(sub, text),
+		SNIPPET_VAR_PAT.sub(sub, title),
+		SNIPPET_VAR_PAT.sub(sub, value)
+	)
+
+def resolve_snippets(ctx):
+	cl = set()
+	types = [''] if ctx.get('local') else ctx.get('types')
+	vars = ctx.get('vars')
+
+	try:
+		snips = []
+		snips.extend(gs.setting('default_snippets', []))
+		snips.extend(gs.setting('snippets', []))
+		for m in snips:
+			try:
+				if snippet_match(ctx, m):
+					for ent in m.get('snippets', []):
+						text = ent.get('text', '')
+						title = ent.get('title', '')
+						value = ent.get('value', '')
+						if text and value:
+							for typename in types:
+								vars['typename'] = typename
+								vars['typename_abbr'] = typename[0].lower() if typename else ''
+								txt, ttl, val = expand_snippet_vars(vars, text, title, value)
+								s = u'%s\t%s \u0282' % (txt, ttl)
+								cl.add((s, val))
+			except:
+				gs.notice(DOMAIN, gs.traceback())
+	except:
+		gs.notice(DOMAIN, gs.traceback())
+	return list(cl)
 
 class GoSublime(sublime_plugin.EventListener):
 	gocode_set = False
@@ -21,11 +72,27 @@ class GoSublime(sublime_plugin.EventListener):
 		if gs.IGNORED_SCOPES.intersection(scopes):
 			return ([], AC_OPTS)
 
+		types = []
+		for r in view.find_by_selector('source.go keyword.control.go'):
+			if view.substr(r) == 'type':
+				end = r.end()
+				r = view.find(r'\s+(\w+)', end)
+				if r.begin() == end:
+					types.append(view.substr(r).lstrip())
+
+		r = view.find('package\s+(\w+)', 0)
+		ctx = {
+			'global': True,
+			'pkgname': view.substr(view.word(r.end())) if r else '',
+			'vars': {},
+			'types': types or [''],
+			'has_types': len(types) > 0,
+		}
+
 		show_snippets = gs.setting('autocomplete_snippets', True) is True
 
-		package_end_pt = self.find_end_pt(view, 'package', 0, pos)
-		if package_end_pt < 0:
-			return (gs.GLOBAL_SNIPPET_PACKAGE, AC_OPTS) if show_snippets else ([], AC_OPTS)
+		if not ctx.get('pkgname'):
+			return (resolve_snippets(ctx), AC_OPTS) if show_snippets else ([], AC_OPTS)
 
 		# gocode is case-sesitive so push the location back to the 'dot' so it gives
 		# gives us everything then st2 can pick the matches for us
@@ -42,9 +109,11 @@ class GoSublime(sublime_plugin.EventListener):
 		pc = view.substr(sublime.Region(pos-1, pos))
 		if show_snippets and (pc.isspace() or pc.isalpha()):
 			if scopes[-1] == 'source.go':
-				cl.extend(gs.GLOBAL_SNIPPETS)
+				cl.extend(resolve_snippets(ctx))
 			elif scopes[-1] == 'meta.block.go' and ('meta.function.plain.go' in scopes or 'meta.function.receiver.go' in scopes):
-				cl.extend(gs.LOCAL_SNIPPETS)
+				ctx['global'] = False
+				ctx['local'] = True
+				cl.extend(resolve_snippets(ctx))
 		return (cl, AC_OPTS)
 
 	def find_end_pt(self, view, pat, start, end, flags=sublime.LITERAL):
@@ -55,18 +124,18 @@ class GoSublime(sublime_plugin.EventListener):
 		global last_gopath
 		gopath = gs.env().get('GOPATH')
 		if gopath and gopath != last_gopath:
-			out, _, _ = gs.runcmd(['go', 'env', 'GOOS', 'GOARCH'])
+			out, _, _ = gsshell.run(cmd=['go', 'env', 'GOOS', 'GOARCH'])
 			vars = out.strip().split()
 			if len(vars) == 2:
 				last_gopath = gopath
-				fn =  os.path.join(gopath, 'pkg', '_'.join(vars))
-				gs.runcmd(['gocode', 'set', 'lib-path', fn])
+				libpath =  os.path.join(gopath, 'pkg', '_'.join(vars))
+				gsshell.run(cmd=['gocode', 'set', 'lib-path', libpath], cwd=gsbundle.BUNDLE_GOBIN)
 
 		comps = []
 		cmd = gs.setting('gocode_cmd', 'gocode')
 		offset = 'c%s' % offset
 		args = [cmd, "-f=json", "autocomplete", fn, offset]
-		js, err, _ = gs.runcmd(args, src)
+		js, err, _ = gsshell.run(cmd=args, input=src)
 		if err:
 			gs.notice(DOMAIN, err)
 		else:

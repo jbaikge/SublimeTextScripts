@@ -36,19 +36,24 @@ def _merge(view, size, text, edit):
 	return dirty
 
 def merge(view, size, text):
+	edit = view.begin_edit()
+	vs = view.settings()
+	ttts = vs.get("translate_tabs_to_spaces")
+	vs.set("translate_tabs_to_spaces", False)
+	origin_src = view.substr(sublime.Region(0, view.size()))
+	if not origin_src.strip():
+		return (False, '')
+
 	try:
-		edit = view.begin_edit()
 		dirty = False
 		err = ''
-		vs = view.settings()
-		ttts = vs.get("translate_tabs_to_spaces")
-		vs.set("translate_tabs_to_spaces", False)
 		if size < 0:
 			size = view.size()
 		dirty = _merge(view, size, text, edit)
 	except MergeException as (err, d):
-		dirty = d
+		dirty = True
 		err = "Could not merge changes into the buffer, edit aborted: %s" % err
+		view.replace(edit, sublime.Region(0, view.size()), origin_src)
 	except Exception as ex:
 		err = "where ma bees at?: %s" % ex
 	finally:

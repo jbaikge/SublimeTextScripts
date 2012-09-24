@@ -1,5 +1,8 @@
+# Sublime modelines - https://github.com/SublimeText/Modelines
+# sublime: translate_tabs_to_spaces false; rulers [100,120]
+
 import sublime
-import subprocess, re, os, threading, tempfile, datetime, uuid
+import subprocess, re, os, threading, tempfile, datetime, uuid, traceback as tbck
 from subprocess import Popen, PIPE
 
 try:
@@ -19,35 +22,20 @@ _settings = {
 	"fmt_tab_width": 8,
 	"gslint_enabled": False,
 	"comp_lint_enabled": False,
+	"comp_lint_commands": [],
 	"gslint_timeout": 0,
 	"autocomplete_snippets": False,
 	"autocomplete_tests": False,
 	"margo_cmd": [],
 	"margo_addr": "",
 	"on_save": [],
+	"shell": [],
+	"default_snippets": [],
+	"snippets": [],
+	"gsbundle_enabled": False,
 }
 
 NAME = 'GoSublime'
-
-GLOBAL_SNIPPET_PACKAGE = [
-	(u'package\tpackage [name] \u0282', 'package ${1:NAME}'),
-	(u'package main\tpackage main \u0282', 'package main\n\nfunc main() {\n\t$0\n}\n')
-]
-GLOBAL_SNIPPET_IMPORT = (u'import\timport (...) \u0282', 'import (\n\t"$1"\n)')
-GLOBAL_SNIPPETS = [
-	GLOBAL_SNIPPET_IMPORT,
-	(u'func\tfunc {...} \u0282', 'func ${1:name}($2)$3 {\n\t$0\n}'),
-	(u'func\tfunc ([receiver]) {...} \u0282', 'func (${1:receiver} ${2:type}) ${3:name}($4)$5 {\n\t$0\n}'),
-	(u'func handler\thttp.HandlerFunc {...} \u0282', 'func ${1:name}(rw http.ResponseWriter, req *http.Request) {\n\t$0\n}'),
-	(u'func main\tfunc main {...} \u0282', 'func main() {\n\t$0\n}\n'),
-	(u'var\tvar (...) \u0282', 'var (\n\t$1\n)'),
-	(u'const\tconst (...) \u0282', 'const (\n\t$1\n)'),
-]
-
-LOCAL_SNIPPETS = [
-	(u'func\tfunc{...}() \u0282', 'func($1) {\n\t$0\n}($2)'),
-	(u'var\tvar [name] [type] \u0282', 'var ${1:name} ${2:type}'),
-]
 
 CLASS_PREFIXES = {
 	'const': u'\u0196',
@@ -93,6 +81,13 @@ IGNORED_SCOPES = frozenset([
 	'comment.block.go'
 ])
 
+def apath(fn, cwd=None):
+	if not os.path.isabs(fn):
+		if not cwd:
+			cwd = os.getcwd()
+		fn = os.path.join(cwd, fn)
+	return os.path.normcase(os.path.normpath(fn))
+
 def temp_dir(subdir=''):
 	tmpdir = os.path.join(tempfile.gettempdir(), NAME, subdir)
 	err = ''
@@ -114,7 +109,7 @@ def basedir_or_cwd(fn):
 		return os.path.dirname(fn)
 	return os.getcwd()
 
-def popen(args, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None):
+def popen(args, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None, bufsize=0):
 	ev = os.environ.copy()
 	ev.update(env())
 	ev.update(environ)
@@ -125,7 +120,7 @@ def popen(args, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None):
 		setsid = None
 
 	return Popen(args, stdout=stdout, stderr=stderr, stdin=PIPE, startupinfo=STARTUP_INFO,
-		shell=shell, env=ev, cwd=cwd, preexec_fn=setsid)
+		shell=shell, env=ev, cwd=cwd, preexec_fn=setsid, bufsize=bufsize)
 
 def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None):
 	out = ""
@@ -134,7 +129,7 @@ def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False, environ={}, 
 
 	try:
 		p = popen(args, stdout=stdout, stderr=stderr, shell=shell, environ=environ, cwd=cwd)
-		if isinstance(input, unicode):
+		if input is not None:
 			input = input.encode('utf-8')
 		out, err = p.communicate(input=input)
 		out = out.decode('utf-8') if out else ''
@@ -144,6 +139,12 @@ def runcmd(args, input=None, stdout=PIPE, stderr=PIPE, shell=False, environ={}, 
 		exc = e
 
 	return (out, err, exc)
+
+def is_a(v, base):
+	return isinstance(v, type(base))
+
+def is_a_string(v):
+	return isinstance(v, basestring)
 
 def settings_obj():
 	return sublime.load_settings("GoSublime.sublime-settings")
@@ -172,10 +173,15 @@ def notice_undo(domain, txt, view, should_undo):
 		notice(domain, txt)
 	sublime.set_timeout(cb, 0)
 
-def show_output(panel_name, s, print_output=True, syntax_file=''):
-	def cb(panel_name, s, print_output, win):
-		if print_output:
-			print('%s output: %s' % (panel_name, s))
+def show_output(domain, s, print_output=True, syntax_file='', replace=True, merge_domain=False, scroll_end=False):
+	def cb(domain, s, print_output, win):
+		panel_name = '%s-output' % domain
+		if merge_domain:
+			s = '%s: %s' % (domain, s)
+			if print_output:
+				println(s)
+		elif print_output:
+			println('%s: %s' % (domain, s))
 
 		win = sublime.active_window()
 		if win:
@@ -184,7 +190,10 @@ def show_output(panel_name, s, print_output=True, syntax_file=''):
 			panel.set_read_only(False)
 
 			try:
-				panel.replace(edit, sublime.Region(0, panel.size()), s)
+				if replace:
+					panel.replace(edit, sublime.Region(0, panel.size()), s)
+				else:
+					panel.insert(edit, panel.size(), s+'\n')
 			finally:
 				panel.end_edit(edit)
 
@@ -193,7 +202,7 @@ def show_output(panel_name, s, print_output=True, syntax_file=''):
 			pst.set("rulers", [])
 			pst.set("fold_buttons", True)
 			pst.set("fade_fold_buttons", False)
-			pst.set("gutter", True)
+			pst.set("gutter", False)
 			pst.set("line_numbers", False)
 			if syntax_file:
 				if syntax_file == 'GsDoc':
@@ -203,7 +212,9 @@ def show_output(panel_name, s, print_output=True, syntax_file=''):
 					panel.set_syntax_file(syntax_file)
 			panel.set_read_only(True)
 			win.run_command("show_panel", {"panel": "output.%s" % panel_name})
-	sublime.set_timeout(lambda: cb(panel_name, s, print_output, syntax_file), 0)
+			if scroll_end:
+				panel.show(panel.size())
+	sublime.set_timeout(lambda: cb(domain, s, print_output, syntax_file), 0)
 
 def is_pkg_view(view=None):
 	# todo implement this fully
@@ -235,15 +246,25 @@ def active_valid_go_view(win=None, strict=True):
 def rowcol(view):
 	return view.rowcol(view.sel()[0].begin())
 
+def os_is_windows():
+	return os.name == "nt"
+
 def getenv(name, default=''):
 	return env().get(name, default)
 
 def env():
+	"""
+	Assamble environment information needed for correct operation. In particular,
+	ensure that directories containing binaries are included in PATH.
+	"""
 	e = os.environ.copy()
 	e.update(setting('env', {}))
 	roots = e.get('GOPATH', '').split(os.pathsep)
 	roots.append(e.get('GOROOT', ''))
 
+	# For custom values of GOPATH, installed binaries via go install
+	# will go into the "bin" dir of the corresponding GOPATH path.
+	# Therefore, make sure these paths are included in PATH.
 	add_path = e.get('PATH', '').split(os.pathsep)
 	for s in roots:
 		if s:
@@ -251,16 +272,30 @@ def env():
 			if s not in add_path:
 				add_path.append(s)
 
-	if os.name == "nt":
+	if os_is_windows():
 		l = ['C:\\Go\\bin']
 	else:
-		l = ['/usr/bin', '/usr/local/go/bin']
+		l = ['/usr/local/go/bin', '/usr/bin']
 
 	for s in l:
 		if s not in add_path:
 			add_path.append(s)
 
 	e['PATH'] = os.pathsep.join(add_path)
+
+	# Ensure no unicode objects leak through. The reason is twofold:
+	# 	* On Windows, Python 2.6 (used by Sublime Text) subprocess.Popen
+	# 	  can only take bytestrings as environment variables in the
+	#	  "env"	parameter. Reference:
+	# 	  https://github.com/DisposaBoy/GoSublime/issues/112
+	# 	  http://stackoverflow.com/q/12253014/1670
+	#   * Avoids issues with networking too.
+	for k, v in e.iteritems():
+		try:
+			e[k] = str(v)
+		except Exception as ex:
+			println('%s: Bad env: %s' % (NAME, ex))
+
 	return e
 
 def sync_settings():
@@ -440,7 +475,7 @@ def show_quick_panel(items, cb=None):
 
 def go_env_goroot():
 	out, _, _ = runcmd(['go env GOROOT'], shell=True)
-	return out.strip()
+	return out.strip().encode('utf-8')
 
 def list_dir_tree(dirname, filter, exclude_prefix=('.', '_')):
 	lst = []
@@ -469,6 +504,21 @@ def list_dir_tree(dirname, filter, exclude_prefix=('.', '_')):
 
 	return lst
 
+def traceback(domain='GoSublime'):
+	return '%s: %s' % (domain, tbck.format_exc())
+
+def show_traceback(domain):
+	show_output(domain, traceback(), replace=False, merge_domain=False)
+
+def ustr(s):
+	if isinstance(s, unicode):
+		return s
+	return str(s).decode('utf-8')
+
+def astr(s):
+	if isinstance(s, unicode):
+		return s.encode('utf-8')
+	return str(s)
 
 try:
 	st2_status_message
