@@ -1,0 +1,20 @@
+{
+	"name": "GoSublime Commander",
+	"scopeName": "text.gscommander",
+	"fileTypes": ["gosublime-commander"],
+	"patterns": [
+		{
+			"name": "path.gscommander storage.type.class.gscommander",
+			"match": "((?:\\w+://)\\S+)"
+		},
+		{
+			"name": "path.gscommander storage.type.class.gscommander",
+			"match": "((?:(?:\\w+:|[.]*)?[\\\\/].+?|(\\S+))(?:[.][^\\d][-~\\w]*)+(?:[:]\\d+){0,2})"
+		},
+		{
+			"name": "prompt.gscommander string.gscommander",
+			"match": "(#.+)"
+		}
+	],
+	"uuid": "78c486ec-0101-11e2-a85a-00262d996a67"
+}

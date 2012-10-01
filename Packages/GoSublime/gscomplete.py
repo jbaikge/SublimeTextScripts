@@ -1,9 +1,16 @@
-import sublime, sublime_plugin
-import json, os, re
-import gscommon as gs, gsshell, gsbundle
+import sublime
+import sublime_plugin
+import json
+import os
+import re
+import gscommon as gs
+import gsshell
+import gsbundle
 from os.path import basename
+from os.path import dirname
 
 AC_OPTS = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+REASONABLE_PKGNAME_PAT = re.compile(r'^\w+$')
 
 last_gopath = ''
 END_SELECTOR_PAT = re.compile(r'.*?((?:[\w.]+\.)?(\w+))$')
@@ -35,7 +42,10 @@ def expand_snippet_vars(vars, text, title, value):
 def resolve_snippets(ctx):
 	cl = set()
 	types = [''] if ctx.get('local') else ctx.get('types')
-	vars = ctx.get('vars')
+	vars = {}
+	for k,v in ctx.iteritems():
+		if gs.is_a_string(v):
+			vars[k] = v
 
 	try:
 		snips = []
@@ -80,15 +90,24 @@ class GoSublime(sublime_plugin.EventListener):
 				if r.begin() == end:
 					types.append(view.substr(r).lstrip())
 
+
+		try:
+			default_pkgname = basename(dirname(view.file_name()))
+		except Exception:
+			default_pkgname = ''
+
+		if not REASONABLE_PKGNAME_PAT.match(default_pkgname):
+			default_pkgname = ''
+
 		r = view.find('package\s+(\w+)', 0)
 		ctx = {
 			'global': True,
 			'pkgname': view.substr(view.word(r.end())) if r else '',
-			'vars': {},
 			'types': types or [''],
 			'has_types': len(types) > 0,
+			'default_pkgname': default_pkgname,
+			'fn': view.file_name() or '',
 		}
-
 		show_snippets = gs.setting('autocomplete_snippets', True) is True
 
 		if not ctx.get('pkgname'):

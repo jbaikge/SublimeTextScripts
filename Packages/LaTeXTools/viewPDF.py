@@ -9,6 +9,10 @@ from subprocess import Popen
 
 class View_pdfCommand(sublime_plugin.WindowCommand):
 	def run(self):
+		s = sublime.load_settings("LaTeXTools Preferences.sublime-settings")
+		prefs_keep_focus = s.get("keep_focus", True)
+		prefs_lin = s.get("linux")
+
 		view = self.window.active_view()
 		texFile, texExt = os.path.splitext(view.file_name())
 		if texExt.upper() != ".TEX":
@@ -20,6 +24,7 @@ class View_pdfCommand(sublime_plugin.WindowCommand):
 		rootFile, rootExt = os.path.splitext(root)
 		pdfFile = quotes + rootFile + '.pdf' + quotes
 		s = platform.system()
+		script_path = None
 		if s == "Darwin":
 			# for inverse search, set up a "Custom" sync profile, using
 			# "subl" as command and "%file:%line" as argument
@@ -32,15 +37,20 @@ class View_pdfCommand(sublime_plugin.WindowCommand):
 			# Under "Set inverse search command-line", set:
 			# sublime_text "%f":%l
 			viewercmd = ["SumatraPDF", "-reuse-instance"]		
+		elif s == "Linux":
+			# the required scripts are in the 'evince' subdir
+			script_path = os.path.join(sublime.packages_path(), 'LaTeXTools', 'evince')
+			ev_sync_exec = os.path.join(script_path, 'evince_sync') # so we get inverse search
+			# Get python binary if set in preferences:
+			py_binary = prefs_lin["python2"] or 'python'
+			sb_binary = prefs_lin["sublime"] or 'sublime-text'
+			viewercmd = ['sh', ev_sync_exec, py_binary, sb_binary]
 		else:
 			sublime.error_message("Platform as yet unsupported. Sorry!")
 			return	
 		print viewercmd + [pdfFile]
 		try:
-			# this works on OSX but not Windows, and in any case it's old-fashioned
-			#os.system(viewercmd + pdfFile)
-			# better:
-			Popen(viewercmd + [pdfFile])
+			Popen(viewercmd + [pdfFile], cwd=script_path)
 		except OSError:
 			sublime.error_message("Cannot launch Viewer. Make sure it is on your PATH.")
 

@@ -54,7 +54,11 @@ class Prompt(object):
 					hist = {}
 				basedir = gs.basedir_or_cwd(file_name)
 				hist[basedir] = [s] # todo: store a list of historical commands
-				self.settings.set('cmd_hist', hist)
+				hst = {}
+				for k in hist:
+					# :|
+					hst[gs.ustr(k)] = gs.ustr(hist[k])
+				self.settings.set('cmd_hist', hst)
 				sublime.save_settings('GoSublime-GsShell.sublime-settings')
 
 			if GO_SHARE_PAT.match(s):
@@ -264,11 +268,12 @@ class Command(threading.Thread):
 		self.output_started = 0
 		self.ended = 0
 		self.on_output = command_on_output
-		self.on_done = command_on_done
 		self.env = fix_env(env)
 		self.shell, self.cmd = fix_shell_cmd(shell, cmd)
 		self.message = str(self.cmd)
 		self.cwd = cwd if cwd else None
+		self.on_done = command_on_done
+		self.done = []
 
 	def outq(self):
 		return self.q
@@ -348,16 +353,24 @@ class Command(threading.Thread):
 			except Exception as ex:
 				self.x = ex
 			finally:
-				self.rcode = self.p.wait()
+				self.rcode = self.p.wait() if self.p else False
 		finally:
 			gs.end(tid)
 			self.ended = time.time()
 			self.on_done(self)
 
+			for f in self.done:
+				try:
+					f(self)
+				except Exception:
+					gs.notice(DOMAIN, gs.traceback())
+
 class ViewCommand(Command):
-	def __init__(self, cmd=[], shell=False, env={}, cwd='', view=None):
+	def __init__(self, cmd=[], shell=False, env={}, cwd=None, view=None):
 		self.view = view
 		super(ViewCommand, self).__init__(cmd=cmd, shell=shell, env=env, cwd=cwd)
+
+		self.output_done = []
 
 		if not self.cwd and view is not None:
 			try:
@@ -376,7 +389,9 @@ class ViewCommand(Command):
 		if l:
 			self.do_insert(l)
 
-		if not self.completed() or self.q.qsize() > 0:
+		if self.completed() and self.q.qsize() == 0:
+			self.on_output_done()
+		else:
 			sublime.set_timeout(self.poll_output, 100)
 
 	def do_insert(self, lines):
@@ -395,13 +410,19 @@ class ViewCommand(Command):
 				gs.println(gs.traceback(DOMAIN))
 		view.show(view.line(view.size() - 1).begin())
 
-	def on_done(self, c):
+	def on_output_done(self):
 		ex = self.exception()
 		if ex:
-			self.on_output(c, 'Error: ' % ex)
+			self.on_output(self, 'Error: ' % ex)
 
-		t = (max(0, c.ended - c.started), max(0, c.output_started - c.started))
-		self.on_output(c, '[done: elapsed: %0.3fs, startup: %0.3fs]\n' % t)
+		t = (max(0, self.ended - self.started), max(0, self.output_started - self.started))
+		self.do_insert(['[ elapsed: %0.3fs, startup: %0.3fs]\n' % t])
+
+		for f in self.output_done:
+			try:
+				f(self)
+			except Exception:
+				gs.notice(DOMAIN, gs.traceback())
 
 	def cancel(self):
 		discarded = super(ViewCommand, self).cancel()

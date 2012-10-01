@@ -12,6 +12,7 @@ try:
 except (AttributeError):
 	STARTUP_INFO = None
 
+environ9 = {}
 _sem = threading.Semaphore()
 _settings = {
 	"env": {},
@@ -110,9 +111,9 @@ def basedir_or_cwd(fn):
 	return os.getcwd()
 
 def popen(args, stdout=PIPE, stderr=PIPE, shell=False, environ={}, cwd=None, bufsize=0):
-	ev = os.environ.copy()
-	ev.update(env())
-	ev.update(environ)
+	ev = env()
+	for k,v in environ.iteritems():
+		ev[astr(k)] = astr(v)
 
 	try:
 		setsid = os.setsid
@@ -156,7 +157,7 @@ def setting(key, default=None):
 def println(*a):
 	print('\n** %s **:' % datetime.datetime.now())
 	for s in a:
-		print(str(s).strip())
+		print(ustr(s).strip())
 	print('--------------------------------')
 
 debug = println
@@ -258,6 +259,7 @@ def env():
 	ensure that directories containing binaries are included in PATH.
 	"""
 	e = os.environ.copy()
+	e.update(environ9)
 	e.update(setting('env', {}))
 	roots = e.get('GOPATH', '').split(os.pathsep)
 	roots.append(e.get('GOROOT', ''))
@@ -290,13 +292,14 @@ def env():
 	# 	  https://github.com/DisposaBoy/GoSublime/issues/112
 	# 	  http://stackoverflow.com/q/12253014/1670
 	#   * Avoids issues with networking too.
+	clean_env = {}
 	for k, v in e.iteritems():
 		try:
-			e[k] = str(v)
+			clean_env[astr(k)] = astr(v)
 		except Exception as ex:
 			println('%s: Bad env: %s' % (NAME, ex))
 
-	return e
+	return clean_env
 
 def sync_settings():
 	global _settings

@@ -196,13 +196,14 @@ def do_comp_lint(dirname, fn):
 		'GOBIN': bindir,
 	}
 
-	pat = r'%s:(\d+)(?:[:](\d+))?\W+(.+?)\s*$' % re.escape(os.path.basename(fn))
+	pat = r'%s:(\d+)(?:[:](\d+))?\W+(.+)\s*' % re.escape(os.path.basename(fn))
 	pat = re.compile(pat, re.IGNORECASE)
 	for c in gs.setting('comp_lint_commands'):
 		try:
 			cmd = c.get('cmd')
 			if not cmd:
 				continue
+			cmd_domain = ' '.join(cmd)
 
 			shell = c.get('shell') is True
 			env = {} if c.get('global') is True else local_env
@@ -210,7 +211,7 @@ def do_comp_lint(dirname, fn):
 			if err:
 				gs.notice(DOMAIN, err)
 
-			out = out.replace('\r', '').replace('\n ', '\\n').replace('\n\t', '\\n')
+			out = out.replace('\r', '').replace('\n ', '\\n ').replace('\n\t', '\\n\t')
 			for m in pat.findall(out):
 				try:
 					row, col, msg = m
@@ -218,6 +219,7 @@ def do_comp_lint(dirname, fn):
 					col = int(col)-1 if col else 0
 					msg = msg.replace('\\n', '\n').strip()
 					if row >= 0 and msg:
+						msg = '%s: %s' % (cmd_domain, msg)
 						if reports.get(row):
 							reports[row].msg = '%s\n%s' % (reports[row].msg, msg)
 							reports[row].col = max(reports[row].col, col)
