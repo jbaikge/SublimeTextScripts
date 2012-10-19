@@ -1,8 +1,9 @@
 {
-	"auto_upgrade_last_run": 1350039613,
+	"auto_upgrade_last_run": 1350483857,
 	"installed_packages":
 	[
 		"Alignment",
+		"Awk",
 		"Git",
 		"GoSublime",
 		"INI",
