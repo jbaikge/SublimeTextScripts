@@ -6,9 +6,8 @@ by Marciano Siniscalchi
 
 Additional contributors (*thank you thank you thank you*): first of all, Wallace Wu and Juerg Rast, who contributed code for multifile support in ref and cite completions, "new-style" ref/cite completion, and project file support. Also, Sam Finn (initial multifile support for the build command); Daniel Fleischhacker (Linux build fixes), Mads Mobaek (universal newline support), Stefan Ollinger (initial Linux support), RoyalTS (aka Tobias Schidt?) (help with bibtex regexes and citation code, various fixes), Juan Falgueras (latexmk option to handle non-ASCII paths). *If you have contributed and I haven't acknowledged you, email me!*
 
-Latest revision: *2012-10-21*. Highlight: I am going to introduce "graceful" error reporting via the status message at the bottom of the ST2 window. Right now this is implemented for cite completion. See below for details.
+Latest revision: *2012-11-7*. Highlight: The new log-file parser is now in place. On one hand, this should be a lot more robust, and I have tested it extensively on all three platforms (and, on Windows, with both MikTeX and TeXLive). On the other hand, right now the code strict in the sense that, if it can't make sense of a log file, it displays an error message. Hopefully this will occur only in strange edge cases, but please *let me know on github* if you see an error message. I need a log file to diagnose the problem; please upload it to gist, dropbox, or similar, and paste a link in your message on github. Issue #104 is open for that purpose. Thanks!
 
-*Older Warning*: I changed keybindings in mid-September 2012. Read the section titled "New-style keybindings." Also, on Windows, please note that *TeXLive* is the "preferred" TeX distribution, not MiKTeX. This has been the case for a long time, but I forgot to update this README file.
 
 Introduction
 ------------
@@ -36,13 +35,13 @@ Third, follow the OS-specific instructions below.
 
 <br>
 
-On **OSX**, you need to be running the MacTeX distribution (which is pretty much the only one available on the Mac anyway) and the Skim PDF previewer. Just download and install these in the usual way. I have tested MacTeX versions 2010 and 2011, both 32 and 64 bits; these work fine. On the other hand, MacTeX 2008 does *not* seem to work out of the box (compilation fails), so please upgrade.
+On **OSX**, you need to be running the MacTeX distribution (which is pretty much the only one available on the Mac anyway) and the Skim PDF previewer. Just download and install these in the usual way. I have tested MacTeX versions 2010 and 2011, both 32 and 64 bits; these work fine. On the other hand, MacTeX 2008 does *not* seem to work out of the box (compilation fails), so please upgrade. If you don't want to install the entire MacTeX distro, which is pretty big, BasicTeX will also work (of course, as long as the latex packages you need are included). **However**, you need to explicitly add the `latexmk` utility, which is not included by default: from the Terminal, type `sudo tlmgr install latexmk` (you will need to provide your password, assuming you are Administrator on your machine).
 
 To configure inverse search, open the Preferences dialog of the Skim app, select the Sync tab, then:
 
 * uncheck the "Check for file changes" option
 * Preset: Custom
-* Command: `/Applications/Sublime Text 2.app/Contents/SharedSupport/bin/subl`.
+* Command: `"/Applications/Sublime Text 2.app/Contents/SharedSupport/bin/subl"`
 * Arguments: "%file":%line
 
 Note: in case you have created a symlink to Sublime Text somewhere in your path, you can of course use that, too in the Command field. The above will work in any case though, and does *not* require you to create a symlink or mess with the Terminal in any way!
