@@ -1,3 +1,21 @@
+## r12.11.15-1
+	* MarGo (margo0) and gocode are now bundled with GoSublime and should be in active use.
+	    Feel free to remove any old source from $GOPATH*/github.com/{nsf/gocode,DisposaBoy/MarGo}
+	    if you have no use for them in additiion to their respective binaries
+
+## r12.11.04-1
+	* added new setting `complete_builtins`
+	  set this to `true` to show builtin type and functions in the completion menu
+
+## r12.11.03-1
+	* BREAKING CHANGES ARE COMING: in the next GoSublime update support for windows-style
+	    environment variables will be removed.
+	    If you have environment variables that are not expanded before GS sees them and they are
+	    of the form `%HOME%`, `%GOPATH%` etc. they will no longer be expanded.
+	    You should transition to *nix-style env vars.
+
+	    i.e `%GOPATH%` etc. should be changed to `$GOPATH`. `$$` can be used to escape to escape`$` characters
+
 ## r12.09.22-1
 	* the experimental gsshell replacement codename shelly is no more.
 	    it has been replaced with gscommander which operates from within the output panel

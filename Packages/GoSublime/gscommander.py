@@ -5,12 +5,17 @@ import gsshell
 import os
 import re
 import webbrowser
+import mg9
+import shlex
+import uuid
 
 DOMAIN = "GsCommander"
 AC_OPTS = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 SPLIT_FN_POS_PAT = re.compile(r'(.+?)(?:[:](\d+))?(?:[:](\d+))?$')
 URL_SCHEME_PAT = re.compile(r'^\w+://')
 URL_PATH_PAT = re.compile(r'^(?:\w+://|(?:www|(?:\w+\.)*(?:golang|pkgdoc|gosublime)\.org))')
+
+HOURGLASS = u'\u231B'
 
 DEFAULT_COMMANDS = [
 	'go build',
@@ -23,6 +28,7 @@ DEFAULT_COMMANDS = [
 	'go install',
 	'go list',
 	'go run',
+	'9 play',
 	'go test',
 	'go tool',
 	'go version',
@@ -46,7 +52,7 @@ def wdid(wd):
 
 class EV(sublime_plugin.EventListener):
 	def on_query_completions(self, view, prefix, locations):
-		pos = view.sel()[0].begin()
+		pos = gs.sel(view).begin()
 		if view.score_selector(pos, 'text.gscommander') == 0:
 			return []
 		cl = []
@@ -55,7 +61,7 @@ class EV(sublime_plugin.EventListener):
 
 class GsCommanderInsertLineCommand(sublime_plugin.TextCommand):
 	def run(self, edit, after=True):
-		insln = lambda: self.view.insert(edit, self.view.sel()[0].begin(), "\n")
+		insln = lambda: self.view.insert(edit, gs.sel(self.view).begin(), "\n")
 		if after:
 			self.view.run_command("move_to", {"to": "hardeol"})
 			insln()
@@ -108,7 +114,7 @@ class GsCommanderInitCommand(sublime_plugin.TextCommand):
 			v.show(v.size()-1)
 
 class GsCommanderOpenCommand(sublime_plugin.WindowCommand):
-	def run(self, wd=None):
+	def run(self, wd=None, run=[]):
 		win = self.window
 		wid = win.id()
 		if not wd:
@@ -125,14 +131,25 @@ class GsCommanderOpenCommand(sublime_plugin.WindowCommand):
 		win.focus_view(v)
 		v.run_command('gs_commander_init', {'wd': wd})
 
+		if run:
+			cmd = ' '.join(run)
+			edit = v.begin_edit()
+			try:
+				v.insert(edit, v.line(v.size()-1).end(), cmd)
+				v.sel().clear()
+				v.sel().add(v.line(v.size()-1).end())
+				v.run_command('gs_commander_exec')
+			finally:
+				v.end_edit(edit)
+
 class GsCommanderOpenSelectionCommand(sublime_plugin.TextCommand):
 	def is_enabled(self):
-		pos = self.view.sel()[0].begin()
+		pos = gs.sel(self.view).begin()
 		return self.view.score_selector(pos, 'text.gscommander') > 0
 
 	def run(self, edit):
 		v = self.view
-		pos = v.sel()[0].begin()
+		pos = gs.sel(v).begin()
 		inscope = lambda p: v.score_selector(p, 'path.gscommander') > 0
 		if not inscope(pos):
 			pos -= 1
@@ -162,49 +179,128 @@ class GsCommanderOpenSelectionCommand(sublime_plugin.TextCommand):
 
 class GsCommanderExecCommand(sublime_plugin.TextCommand):
 	def is_enabled(self):
-		pos = self.view.sel()[0].begin()
+		pos = gs.sel(self.view).begin()
 		return self.view.score_selector(pos, 'text.gscommander') > 0
 
 	def run(self, edit):
-		v = self.view
-		pos = v.sel()[0].begin()
-		line = v.line(pos)
-		cmd = v.substr(line).split('#', 2)
-		if len(cmd) == 2:
-			cmd = cmd[1].strip()
+		view = self.view
+		pos = gs.sel(view).begin()
+		line = view.line(pos)
+		wd = view.settings().get('gscommander.wd')
+
+		ln = view.substr(line).split('#', 1)
+		if len(ln) == 2:
+			cmd = ln[1].strip()
+			if cmd:
+				vs = view.settings()
+				lc_key = '%s.last_command' % DOMAIN
+				if cmd[0] == '#':
+					rep = vs.get(lc_key, '')
+					if rep:
+						view.replace(edit, line, ('%s# %s %s' % (ln[0], rep, cmd[1:])))
+					return
+				elif cmd == '!!':
+					cmd = vs.get(lc_key, '')
+				else:
+					vs.set(lc_key, cmd)
+
 			if not cmd:
-				v.run_command('gs_commander_init')
+				view.run_command('gs_commander_init')
 				return
 
-			f = globals().get('cmd_%s' % cmd)
+			view.replace(edit, line, ('[ %s ]' % cmd))
+			rkey = 'gscommander.exec.%s' % uuid.uuid4()
+			view.insert(edit, view.size(), (u"\t%s\n" % HOURGLASS))
+			view.add_regions(rkey, [sublime.Region(line.begin(), view.size())], '')
+			view.run_command('gs_commander_init')
+
+			cli = cmd.split(' ', 1)
+
+			# todo: move this into margo
+			if cli[0] == 'sh':
+				def on_done(c):
+					out = gs.ustr('\n'.join(c.consume_outq()))
+					sublime.set_timeout(lambda: push_output(view, rkey, out), 0)
+
+				c = gsshell.Command(cmd=cli[1], shell=True, cwd=wd)
+				c.on_done = on_done
+				c.start()
+				return
+
+			f = globals().get('cmd_%s' % cli[0])
 			if f:
-				f(v, edit)
-				return
-
-			wd = v.settings().get('gscommander.wd')
-			v.replace(edit, line, ('[ %s ]' % cmd))
-			c = gsshell.ViewCommand(cmd=cmd, shell=True, view=v, cwd=wd)
-
-			def on_output_done(c):
-				def cb():
-					win = sublime.active_window()
-					if win is not None:
-						win.run_command("gs_commander_open")
-				sublime.set_timeout(cb, 0)
-
-			oo = c.on_output
-			def on_output(c, ln):
-				oo(c, '\t'+ln)
-
-			c.on_output = on_output
-			c.output_done.append(on_output_done)
-			c.start()
+				args = shlex.split(gs.astr(cli[1])) if len(cli) == 2 else []
+				f(view, edit, args, wd, rkey)
+			else:
+				push_output(view, rkey, 'Invalid command %s' % cli)
 		else:
-			v.insert(edit, v.sel()[0].begin(), '\n')
+			view.insert(edit, gs.sel(view).begin(), '\n')
 
-def cmd_reset(view, edit):
+def push_output(view, rkey, out):
+	out = '\t%s' % out.strip().replace('\r', '').replace('\n', '\n\t')
+	edit = view.begin_edit()
+	try:
+		regions = view.get_regions(rkey)
+		if regions:
+			line = view.line(regions[0].end()-1)
+			if view.substr(line).strip() == HOURGLASS:
+				view.replace(edit, line, out)
+			else:
+				view.insert(edit, line.end()-1, '\n%s' % out)
+		else:
+			view.insert(edit, view.size(), out)
+	finally:
+		view.end_edit(edit)
+
+def cmd_reset(view, edit, args, wd, rkey):
 	view.erase(edit, sublime.Region(0, view.size()))
 	view.run_command('gs_commander_init')
 
-def cmd_clear(view, edit):
-	cmd_reset(view, edit)
+def cmd_clear(view, edit, args, wd, rkey):
+	cmd_reset(view, edit, args, wd, rkey)
+
+def cmd_9(view, edit, args, wd, rkey):
+	if len(args) == 0 or args[0] not in ('play', 'build'):
+		push_output(view, rkey, ('9: invalid args %s' % args))
+		return
+
+	subcmd = args[0]
+	dmn = '%s: 9 %s' % (DOMAIN, subcmd)
+	msg = '[ %s ] # 9 %s' % (wd, ' '.join(args))
+	cid = '9%s-%s' % (subcmd, uuid.uuid4())
+	tid = gs.begin(dmn, msg, set_status=False, cancel=lambda: mg9.acall('kill', {'cid': cid}, None))
+
+	def cb(res, err):
+		out = '\n'.join(s for s in (res.get('out'), res.get('err'), err) if s)
+		def f():
+			gs.end(tid)
+			push_output(view, rkey, out)
+		sublime.set_timeout(f, 0)
+
+	a = {
+		'cid': cid,
+		'env': gs.env(),
+		'dir': wd,
+		'args': args[1:],
+		'build_only': (subcmd == 'build'),
+	}
+
+	win = view.window()
+	if win is not None:
+		av = win.active_view()
+		if av is not None:
+			fn = av.file_name()
+			if fn:
+				basedir = gs.basedir_or_cwd(fn)
+				for v in win.views():
+					try:
+						fn = v.file_name()
+						if fn and v.is_dirty() and fn.endswith('.go') and os.path.dirname(fn) == basedir:
+							v.run_command('gs_fmt_save')
+					except Exception:
+						gs.println(gs.traceback())
+			else:
+				if gs.is_go_source_view(av, False):
+					a['src'] = av.substr(sublime.Region(0, av.size()))
+
+	mg9.acall('play', a, cb)

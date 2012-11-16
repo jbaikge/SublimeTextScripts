@@ -2,8 +2,18 @@
 # sublime: translate_tabs_to_spaces false; rulers [100,120]
 
 import sublime
-import subprocess, re, os, threading, tempfile, datetime, uuid, traceback as tbck
+import subprocess
+import re
+import os
+import threading
+import tempfile
+import datetime
+import uuid
+import traceback as tbck
+import json
 from subprocess import Popen, PIPE
+import copy
+import string
 
 try:
 	STARTUP_INFO = subprocess.STARTUPINFO()
@@ -12,75 +22,86 @@ try:
 except (AttributeError):
 	STARTUP_INFO = None
 
-environ9 = {}
-_sem = threading.Semaphore()
-_settings = {
-	"env": {},
-	"gscomplete_enabled": False,
-	"gocode_cmd": "",
-	"fmt_enabled": False,
-	"fmt_tab_indent": True,
-	"fmt_tab_width": 8,
-	"gslint_enabled": False,
-	"comp_lint_enabled": False,
-	"comp_lint_commands": [],
-	"gslint_timeout": 0,
-	"autocomplete_snippets": False,
-	"autocomplete_tests": False,
-	"margo_cmd": [],
-	"margo_addr": "",
-	"on_save": [],
-	"shell": [],
-	"default_snippets": [],
-	"snippets": [],
-	"gsbundle_enabled": False,
-}
+try:
+	NAME
+except:
+	NAME = 'GoSublime'
 
-NAME = 'GoSublime'
+	_attr_lck = threading.Lock()
+	_attr = {}
 
-CLASS_PREFIXES = {
-	'const': u'\u0196',
-	'func': u'\u0192',
-	'type': u'\u0288',
-	'var':  u'\u03BD',
-	'package': u'package \u03C1',
-}
+	_checked_lck = threading.Lock()
+	_checked = {}
 
-NAME_PREFIXES = {
-	'interface': u'\u00A1',
-}
+	environ9 = {}
+	_env_lck = threading.Lock()
+	_default_settings = {
+		"env": {},
+		"gscomplete_enabled": False,
+		"gocode_cmd": "",
+		"complete_builtins": False,
+		"fmt_enabled": False,
+		"fmt_tab_indent": True,
+		"fmt_tab_width": 8,
+		"gslint_enabled": False,
+		"comp_lint_enabled": False,
+		"comp_lint_commands": [],
+		"gslint_timeout": 0,
+		"autocomplete_snippets": False,
+		"autocomplete_tests": False,
+		"margo_cmd": [],
+		"margo_addr": "",
+		"on_save": [],
+		"shell": [],
+		"default_snippets": [],
+		"snippets": [],
+	}
+	_settings = copy.copy(_default_settings)
 
-GOARCHES = [
-	'386',
-	'amd64',
-	'arm',
-]
 
-GOOSES = [
-	'darwin',
-	'freebsd',
-	'linux',
-	'netbsd',
-	'openbsd',
-	'plan9',
-	'windows',
-	'unix',
-]
+	CLASS_PREFIXES = {
+		'const': u'\u0196',
+		'func': u'\u0192',
+		'type': u'\u0288',
+		'var':  u'\u03BD',
+		'package': u'package \u03C1',
+	}
 
-GOOSARCHES = []
-for s in GOOSES:
-	for arch in GOARCHES:
-		GOOSARCHES.append('%s_%s' % (s, arch))
+	NAME_PREFIXES = {
+		'interface': u'\u00A1',
+	}
 
-GOOSARCHES_PAT = re.compile(r'^(.+?)(?:_(%s))?(?:_(%s))?\.go$' % ('|'.join(GOOSES), '|'.join(GOARCHES)))
+	GOARCHES = [
+		'386',
+		'amd64',
+		'arm',
+	]
 
-IGNORED_SCOPES = frozenset([
-	'string.quoted.double.go',
-	'string.quoted.single.go',
-	'string.quoted.raw.go',
-	'comment.line.double-slash.go',
-	'comment.block.go'
-])
+	GOOSES = [
+		'darwin',
+		'freebsd',
+		'linux',
+		'netbsd',
+		'openbsd',
+		'plan9',
+		'windows',
+		'unix',
+	]
+
+	GOOSARCHES = []
+	for s in GOOSES:
+		for arch in GOARCHES:
+			GOOSARCHES.append('%s_%s' % (s, arch))
+
+	GOOSARCHES_PAT = re.compile(r'^(.+?)(?:_(%s))?(?:_(%s))?\.go$' % ('|'.join(GOOSES), '|'.join(GOARCHES)))
+
+	IGNORED_SCOPES = frozenset([
+		'string.quoted.double.go',
+		'string.quoted.single.go',
+		'string.quoted.raw.go',
+		'comment.line.double-slash.go',
+		'comment.block.go'
+	])
 
 def apath(fn, cwd=None):
 	if not os.path.isabs(fn):
@@ -150,21 +171,49 @@ def is_a_string(v):
 def settings_obj():
 	return sublime.load_settings("GoSublime.sublime-settings")
 
-def setting(key, default=None):
-	with _sem:
-		return _settings.get(key, default)
+def aso():
+	return sublime.load_settings("GoSublime-aux.sublime-settings")
+
+def save_aso():
+	return sublime.save_settings("GoSublime-aux.sublime-settings")
+
+def setting(k, d=None):
+	if k == 'env':
+		nv = dval(copy.copy(_settings.get('env')), {})
+		lpe = dval(attr('last_active_project_settings', {}).get('env'), {})
+		nv.update(lpe)
+		return nv
+
+	v = attr(k, None)
+	if v is not None:
+		return v
+
+	return copy.copy(_settings.get(k, d))
 
 def println(*a):
-	print('\n** %s **:' % datetime.datetime.now())
+	l = []
+	l.append('\n** %s **:' % datetime.datetime.now())
 	for s in a:
-		print(ustr(s).strip())
-	print('--------------------------------')
+		l.append(ustr(s).strip())
+	l.append('--------------------------------')
 
-debug = println
+	l = '%s\n' % '\n'.join(l)
+	print(l)
+	return l
+
+def log(*a):
+	try:
+		LOGFILE.write(println(*a))
+		LOGFILE.flush()
+	except Exception:
+		pass
+
+
+debug = log
 
 def notice(domain, txt):
 	txt = "%s: %s" % (domain, txt)
-	println(txt)
+	log(txt)
 	status_message(txt)
 
 def notice_undo(domain, txt, view, should_undo):
@@ -225,7 +274,7 @@ def is_go_source_view(view=None, strict=True):
 	if view is None:
 		return False
 
-	selector_match = view.score_selector(view.sel()[0].begin(), 'source.go') > 0
+	selector_match = view.score_selector(sel(view).begin(), 'source.go') > 0
 	if selector_match:
 		return True
 
@@ -245,24 +294,38 @@ def active_valid_go_view(win=None, strict=True):
 	return None
 
 def rowcol(view):
-	return view.rowcol(view.sel()[0].begin())
+	return view.rowcol(sel(view).begin())
 
 def os_is_windows():
 	return os.name == "nt"
 
-def getenv(name, default=''):
-	return env().get(name, default)
+def getenv(name, default='', m={}):
+	return env(m).get(name, default)
 
-def env():
+def env(m={}):
 	"""
-	Assamble environment information needed for correct operation. In particular,
+	Assemble environment information needed for correct operation. In particular,
 	ensure that directories containing binaries are included in PATH.
 	"""
 	e = os.environ.copy()
 	e.update(environ9)
 	e.update(setting('env', {}))
+	e.update(m)
+
 	roots = e.get('GOPATH', '').split(os.pathsep)
 	roots.append(e.get('GOROOT', ''))
+
+	lfn = attr('last_active_go_fn', '')
+	comps = lfn.split(os.sep)
+	gs_gopath = []
+	for i, s in enumerate(comps):
+		if s.lower() == "src":
+			p = os.sep.join(comps[:i])
+			if p not in roots:
+				gs_gopath.append(p)
+	gs_gopath.reverse()
+	e['GS_GOPATH'] = os.pathsep.join(gs_gopath)
+
 
 	# For custom values of GOPATH, installed binaries via go install
 	# will go into the "bin" dir of the corresponding GOPATH path.
@@ -285,6 +348,12 @@ def env():
 
 	e['PATH'] = os.pathsep.join(add_path)
 
+	for k in e:
+		try:
+			e[k] = string.Template(e[k]).safe_substitute(e)
+		except Exception as ex:
+			println('%s: Cannot expand env var `%s`: %s' % (NAME, k, ex))
+
 	# Ensure no unicode objects leak through. The reason is twofold:
 	# 	* On Windows, Python 2.6 (used by Sublime Text) subprocess.Popen
 	# 	  can only take bytestrings as environment variables in the
@@ -301,48 +370,28 @@ def env():
 
 	return clean_env
 
+def mirror_settings(so):
+	m = {}
+	for k in _default_settings:
+		v = so.get(k, None)
+		if v is not None:
+			ok = False
+			d = _default_settings[k]
+
+			if is_a(d, []):
+				if is_a(v, []):
+					ok = True
+			elif is_a(d, {}):
+				if is_a(v, []):
+					ok = True
+			else:
+				ok = True
+
+			m[k] = copy.copy(v)
+	return m
+
 def sync_settings():
-	global _settings
-	so = settings_obj()
-	with _sem:
-		for k in _settings:
-			v = so.get(k, None)
-			if v is not None:
-				# todo: check the type of `v`
-				_settings[k] = v
-
-		e = _settings.get('env', {})
-		vfn = ''
-		win = sublime.active_window()
-		if win:
-			view = win.active_view()
-			if view:
-				vfn = view.file_name()
-				psettings = view.settings().get(NAME)
-				if psettings:
-					for k in _settings:
-						v = psettings.get(k, None)
-						if v is not None and k != "env":
-							_settings[k] = v
-					penv = psettings.get('env')
-					if penv:
-						e.update(penv)
-
-		vfn = basedir_or_cwd(vfn)
-		comps = vfn.split(os.sep)
-		gs_gopath = []
-		for i, s in enumerate(comps):
-			if s.lower() == "src":
-				gs_gopath.append(os.sep.join(comps[:i]))
-		gs_gopath.reverse()
-		gs_gopath = str(os.pathsep.join(gs_gopath))
-
-		for k in e:
-			e[k] = e[k].replace('$GS_GOPATH', gs_gopath)
-		for k in e:
-			e[k] = str(os.path.expandvars(os.path.expanduser(e[k])))
-
-		_settings['env'] = e
+	_settings.update(mirror_settings(settings_obj()))
 
 def view_fn(view):
 	if view is not None:
@@ -523,6 +572,78 @@ def astr(s):
 		return s.encode('utf-8')
 	return str(s)
 
+def lst(*a):
+	l = []
+	for v in a:
+		if is_a([], v):
+			l.extend(v)
+		else:
+			l.append(v)
+	return l
+
+def dval(v, d):
+	if v is not None:
+		if is_a_string(d) and is_a_string(v):
+			return v
+
+		if is_a(v, d):
+			return v
+
+	return d
+
+def dist_path(*a):
+	return os.path.join(sublime.packages_path(), 'GoSublime', *a)
+
+def home_path(*a):
+	p = os.path.join(sublime.packages_path(), 'User', 'GoSublime', '9')
+	if not os.path.exists(p):
+		try:
+			os.makedirs(p)
+		except:
+			println('Error while creating 9/home dir', traceback())
+	return os.path.join(p, *a)
+
+def json_decode(s, default):
+	try:
+		res = json.loads(s)
+		if is_a(res, default):
+			return (res, '')
+		return (res, 'Unexpected value type')
+	except Exception as ex:
+		return (default, 'Decode Error: %s' % ex)
+
+def json_encode(a):
+	try:
+		return (json.dumps(a), '')
+	except Exception as ex:
+		return ('', 'Encode Error: %s' % ex)
+
+def attr(k, d=None):
+	with _attr_lck:
+		v = _attr.get(k, None)
+	return d if v is None else copy.copy(v)
+
+def set_attr(k, v):
+	with _attr_lck:
+		_attr[k] = v
+
+# note: this functionality should not be used inside this module
+# continue to use the try: X except: X=Y hack
+def checked(domain, k):
+	with _checked_lck:
+		k = 'common.checked.%s.%s' % (domain, k)
+		v = _checked.get(k, False)
+		_checked[k] = True
+	return v
+
+def sel(view, i=0):
+	try:
+		# view.sel() is a sublime.RegionSet. we want actual a python list behaviour :|
+		l = [r for r in view.sel()]
+		return l[i]
+	except Exception:
+		return sublime.Region(0, 0)
+
 try:
 	st2_status_message
 except:
@@ -543,6 +664,13 @@ except:
 	sublime.status_message = status_message
 
 	sched_sm_cb()
+
+	DEVNULL = open(os.devnull, 'w')
+	try:
+		LOGFILE = open(home_path('log.txt'), 'a+')
+	except Exception as ex:
+		LOGFILE = DEVNULL
+		notice(NAME, 'Cannot create log file. Remote(margo) and persistent logging will be disabled. Error: %s' % ex)
 
 # init
 settings_obj().clear_on_change("GoSublime.settings")
