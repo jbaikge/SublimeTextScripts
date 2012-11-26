@@ -208,9 +208,8 @@ class GsCommanderExecCommand(sublime_plugin.TextCommand):
 				view.run_command('gs_commander_init')
 				return
 
-			view.replace(edit, line, ('[ %s ]' % cmd))
+			view.replace(edit, line, (u'[ %s %s ]' % (cmd, HOURGLASS)))
 			rkey = 'gscommander.exec.%s' % uuid.uuid4()
-			view.insert(edit, view.size(), (u"\t%s\n" % HOURGLASS))
 			view.add_regions(rkey, [sublime.Region(line.begin(), view.size())], '')
 			view.run_command('gs_commander_init')
 
@@ -236,21 +235,38 @@ class GsCommanderExecCommand(sublime_plugin.TextCommand):
 		else:
 			view.insert(edit, gs.sel(view).begin(), '\n')
 
-def push_output(view, rkey, out):
+def push_output(view, rkey, out, hourglass_repl=''):
 	out = '\t%s' % out.strip().replace('\r', '').replace('\n', '\n\t')
 	edit = view.begin_edit()
 	try:
 		regions = view.get_regions(rkey)
 		if regions:
-			line = view.line(regions[0].end()-1)
-			if view.substr(line).strip() == HOURGLASS:
-				view.replace(edit, line, out)
-			else:
-				view.insert(edit, line.end()-1, '\n%s' % out)
+			line = view.line(regions[0].begin())
+			lsrc = view.substr(line).replace(HOURGLASS, (hourglass_repl or '| done'))
+			view.replace(edit, line, lsrc)
+			if out.strip():
+				line = view.line(regions[0].begin())
+				view.insert(edit, line.end(), '\n%s' % out)
 		else:
-			view.insert(edit, view.size(), out)
+			view.insert(edit, view.size(), '\n%s' % out)
 	finally:
 		view.end_edit(edit)
+
+def _9_begin_call(name, view, edit, args, wd, rkey):
+	dmn = '%s: 9 %s' % (DOMAIN, name)
+	msg = '[ %s ] # 9 %s' % (wd, ' '.join(args))
+	cid = '9%s-%s' % (name, uuid.uuid4())
+	tid = gs.begin(dmn, msg, set_status=False, cancel=lambda: mg9.acall('kill', {'cid': cid}, None))
+
+	def cb(res, err):
+		out = '\n'.join(s for s in (res.get('out'), res.get('err'), err) if s)
+		def f():
+			gs.end(tid)
+			push_output(view, rkey, out, hourglass_repl='| done: %s' % res.get('dur', ''))
+
+		sublime.set_timeout(f, 0)
+
+	return cid, cb
 
 def cmd_reset(view, edit, args, wd, rkey):
 	view.erase(edit, sublime.Region(0, view.size()))
@@ -259,24 +275,26 @@ def cmd_reset(view, edit, args, wd, rkey):
 def cmd_clear(view, edit, args, wd, rkey):
 	cmd_reset(view, edit, args, wd, rkey)
 
+def cmd_go(view, edit, args, wd, rkey):
+	cid, cb = _9_begin_call('go', view, edit, args, wd, rkey)
+	a = {
+		'cid': cid,
+		'env': gs.env(),
+		'cwd': wd,
+		'cmd': {
+			'name': 'go',
+			'args': args,
+		}
+	}
+	mg9.acall('sh', a, cb)
+
 def cmd_9(view, edit, args, wd, rkey):
 	if len(args) == 0 or args[0] not in ('play', 'build'):
 		push_output(view, rkey, ('9: invalid args %s' % args))
 		return
 
 	subcmd = args[0]
-	dmn = '%s: 9 %s' % (DOMAIN, subcmd)
-	msg = '[ %s ] # 9 %s' % (wd, ' '.join(args))
-	cid = '9%s-%s' % (subcmd, uuid.uuid4())
-	tid = gs.begin(dmn, msg, set_status=False, cancel=lambda: mg9.acall('kill', {'cid': cid}, None))
-
-	def cb(res, err):
-		out = '\n'.join(s for s in (res.get('out'), res.get('err'), err) if s)
-		def f():
-			gs.end(tid)
-			push_output(view, rkey, out)
-		sublime.set_timeout(f, 0)
-
+	cid, cb = _9_begin_call(subcmd, view, edit, args, wd, rkey)
 	a = {
 		'cid': cid,
 		'env': gs.env(),
