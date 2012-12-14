@@ -6,6 +6,10 @@
 	"ensure_newline_at_eof_on_save": true,
 	"font_face": "ProggyCleanTT",
 	"font_size": 12,
+	"ignored_packages":
+	[
+		"Vintage"
+	],
 	"indent_guide_options":
 	[
 		"draw_normal",
